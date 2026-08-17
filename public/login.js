@@ -19,20 +19,37 @@ authForm.addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
+    authError.textContent = ''; // Limpiamos errores anteriores
+
     try {
-        // Ejemplo de llamada a Supabase Auth (ajustalo a tu cliente actual):
-        const { data, error } = await supabase.auth.signInWithPassword({
+        // 1. Primero intentamos iniciar sesión (por si el usuario ya tiene cuenta)
+        let { data, error } = await supabase.auth.signInWithPassword({
             email: email,
             password: password,
         });
 
-        if (error) throw error;
+        // 2. Si da error porque la cuenta no existe, intentamos registrarlo automáticamente
+        if (error) {
+            // Puedes revisar si el mensaje indica que no existe el usuario, o probar el signUp directamente
+            const signUpResult = await supabase.auth.signUp({
+                email: email,
+                password: password,
+            });
 
-        // ¡Login exitoso! Redirigimos automáticamente al index.html
+            if (signUpResult.error) {
+                // Si el signUp también falla (ej. contraseña muy corta), lanzamos ese error
+                throw signUpResult.error;
+            }
+            
+            // Si el registro fue exitoso, ya queda logueado o creado
+            data = signUpResult.data;
+        }
+
+        // ¡Login o registro exitoso! Redirigimos al index
         window.location.href = 'index.html';
 
     } catch (error) {
-        // Mostrar error visual en la interfaz
+        // Mostrar error visual en la interfaz de forma amigable
         authError.textContent = error.message || 'Ocurrió un error al ingresar.';
         authError.classList.add('show');
     }
