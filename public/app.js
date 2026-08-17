@@ -137,6 +137,19 @@ window.resetearRecetas = function() {
     generateBtn.onclick = ejecutarGeneracion;
 }
 
+async function ejecutarGeneracion() {
+    if (userIngredients.length === 0) {
+        showAlert('Faltan ingredientes', 'Agregá al menos un ingrediente.', 'warning');
+        return;
+    }
+
+    recipesContainer.innerHTML = `
+        <div class="text-center py-10">
+            <div class="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+            <p class="text-xs text-slate-400 font-medium">Cocinando ideas con IA...</p>
+        </div>
+    `;
+
 // Lógica de Generación con Gemini
 try {
         // Transformamos los objetos en un array de texto plano con los nombres
@@ -232,6 +245,8 @@ try {
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
     }
+
+}
 
 
 generateBtn.addEventListener('click', ejecutarGeneracion);
