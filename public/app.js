@@ -139,14 +139,17 @@ window.resetearRecetas = function() {
 
 // Lógica de Generación con Gemini
 try {
+        // Transformamos los objetos en un array de texto plano con los nombres
+        const ingredientesStrings = Array.isArray(userIngredients) 
+            ? userIngredients.map(i => i.ingredient) 
+            : [];
+
         const respuesta = await fetch('/api/generar-receta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // Cambiamos "userIngredients" por "ingredientes" para que coincida con tu backend
-            body: JSON.stringify({ ingredientes: userIngredients })
+            body: JSON.stringify({ ingredientes: ingredientesStrings }) // <--- Enviamos el array de strings limpio
         });
 
-        // Cambiamos "response" por "respuesta" para que la variable exista
         if (!respuesta.ok) {
             const errorData = await respuesta.json().catch(() => ({}));
             throw new Error(errorData.error || `Error HTTP: ${respuesta.status} - No se pudo generar la receta.`);
