@@ -157,7 +157,7 @@ async function ejecutarGeneracion() {
         const respuesta = await fetch('/api/generar-receta', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ingredientes })
+    body: JSON.stringify({ userIngredients })
 });
 
         if (!response.ok) {
