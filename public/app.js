@@ -138,34 +138,23 @@ window.resetearRecetas = function() {
 }
 
 // Lógica de Generación con Gemini
-async function ejecutarGeneracion() {
-    if (userIngredients.length === 0) {
-        showAlert('Faltan ingredientes', 'Agregá al menos un ingrediente.', 'warning');
-        return;
-    }
-
-    recipesContainer.innerHTML = `
-        <div class="text-center py-10">
-            <div class="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-            <p class="text-xs text-slate-400 font-medium">Cocinando ideas con IA...</p>
-        </div>
-    `;
-
-    try {
-        // La IA se llama desde nuestro propio backend (server.js).
-        // La API key nunca viaja al navegador.
+try {
         const respuesta = await fetch('/api/generar-receta', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userIngredients })
-});
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // Cambiamos "userIngredients" por "ingredientes" para que coincida con tu backend
+            body: JSON.stringify({ ingredientes: userIngredients })
+        });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Error HTTP: ${response.status} - No se pudo generar la receta.`);
+        // Cambiamos "response" por "respuesta" para que la variable exista
+        if (!respuesta.ok) {
+            const errorData = await respuesta.json().catch(() => ({}));
+            throw new Error(errorData.error || `Error HTTP: ${respuesta.status} - No se pudo generar la receta.`);
         }
 
-        const data = await response.json();
+        const data = await respuesta.json();
+        // ... el resto de tu código para mostrar las recetas ...
+
         const recipes = data.recipes;
 
         recipesContainer.innerHTML = recipes.map(recipe => {
@@ -240,7 +229,7 @@ async function ejecutarGeneracion() {
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
     }
-}
+
 
 generateBtn.addEventListener('click', ejecutarGeneracion);
 
