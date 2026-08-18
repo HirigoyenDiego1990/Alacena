@@ -131,28 +131,42 @@ window.saveRecipe = async function(recipe) {
 }
 
 // Convierte el texto de instrucciones de la IA en un array de pasos limpios.
-// Soporta tanto recetas numeradas/con viñetas (una por línea) como texto corrido.
+// Soporta recetas numeradas (en líneas separadas o todas seguidas en el mismo string),
+// recetas con viñetas, y texto corrido sin formato.
 function parsearPasos(instructions) {
     if (typeof instructions !== 'string') return [instructions];
 
     const texto = instructions.trim();
-    const lineas = texto.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
 
-    // Si cada línea empieza con numeración ("1.", "2)") o viñeta ("-", "*", "•"),
-    // es una receta ya estructurada por línea: separamos por línea y sacamos el prefijo.
-    const prefijoPaso = /^(\d+[\.\)]|[-*•])\s*/;
-    const pareceEstructurada = lineas.length > 1 && lineas.every(l => prefijoPaso.test(l));
+    // 1) Buscar marcadores de numeración tipo "1. ", "2) ", etc. en cualquier parte
+    //    del texto -- estén separados por saltos de línea o todos en la misma línea.
+    const regexNumeracion = /(?:^|[\n\s])(\d{1,2})[\.\)]\s+/g;
+    const marcas = [...texto.matchAll(regexNumeracion)];
 
-    if (pareceEstructurada) {
-        return lineas.map(l => l.replace(prefijoPaso, '').trim()).filter(p => p.length > 0);
+    if (marcas.length >= 2) {
+        const pasos = [];
+        for (let i = 0; i < marcas.length; i++) {
+            const inicio = marcas[i].index + marcas[i][0].length;
+            const fin = (i + 1 < marcas.length) ? marcas[i + 1].index : texto.length;
+            const paso = texto.slice(inicio, fin).trim();
+            if (paso.length > 0) pasos.push(paso);
+        }
+        if (pasos.length > 0) return pasos;
     }
 
-    // Si hay varias líneas pero no están numeradas, respetamos esas líneas tal cual.
+    // 2) Sin numeración: si hay líneas separadas, ver si son viñetas ("-", "*", "•")
+    const lineas = texto.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+    const prefijoViñeta = /^[-*•]\s*/;
+
     if (lineas.length > 1) {
+        if (lineas.every(l => prefijoViñeta.test(l))) {
+            return lineas.map(l => l.replace(prefijoViñeta, '').trim()).filter(p => p.length > 0);
+        }
+        // Varias líneas sin numeración ni viñetas: respetarlas tal cual.
         return lineas;
     }
 
-    // Texto corrido en un solo bloque: separamos por oraciones.
+    // 3) Texto corrido en un solo bloque: separar por oraciones.
     return texto.split(/\.\s+/).map(p => p.trim()).filter(p => p.length > 0);
 }
 
