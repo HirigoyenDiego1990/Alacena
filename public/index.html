@@ -8,7 +8,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="shurtcut icon" href="./img/alacena_icon_192x192.png">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Enlace al Manifest -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#f97316">
 </head>
 <body>
     <div id="app">
@@ -16,14 +20,20 @@
             <header class="topbar">
     <div class="brand">
         <div class="brand-mark">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-                <line x1="6" y1="1" x2="6" y2="4"></line>
-                <line x1="10" y1="1" x2="10" y2="4"></line>
-                <line x1="14" y1="1" x2="14" y2="4"></line>
-            </svg>
-        </div>
+    <img 
+        src="./img/alacena_icon_512x512.png" 
+        alt="Alacena - Zafá con lo que tenés" 
+        width="40" 
+        height="40"
+        style="
+            width: 40px; 
+            height: 40px; 
+            object-fit: contain;
+            display: block;
+            filter: drop-shadow(0 1px 2px rgba(31,42,34,0.08));
+        "
+    >
+</div>
         <div class="brand-text-group">
             <h1 class="brand-title">Alacena</h1>
             <span class="brand-subtitle">Zafa con lo que hay</span>
@@ -156,6 +166,16 @@
     </div>
 
     <div id="toast-container"></div>
+
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log("Service Worker registrado con éxito"))
+        .catch((err) => console.log("Error al registrar Service Worker", err));
+    });
+  }
+</script>
 
     <script type="module" src="./app.js"></script>
 </body>

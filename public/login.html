@@ -9,8 +9,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="shurtcut icon" href="./img/alacena_icon_192x192.png">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Enlace al Manifest -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#f97316">
 </head>
 <body>
 
@@ -22,8 +26,19 @@
             <div class="auth-wrap">
                 <div class="auth-hero">
                     <div class="brand-mark-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 138V3a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v135"/><path d="M22 21H2v-2h20v2z"/><path d="M7 10h10"/></svg>
-                    </div>
+    <img 
+        src="./img/alacena_icon_512x512.png" 
+        alt="Alacena" 
+        width="80" 
+        height="80"
+        style="
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        "
+    >
+</div>
                     <h1>Alacena</h1>
                     <p>Aprovechá al máximo lo que tenés en casa y zafa esa comida.</p>
                 </div>
@@ -45,14 +60,24 @@
                     </button>
                 </form>
 
-                <div class="auth-switch">
+                <!-- <div class="auth-switch">
                     <span id="auth-switch-text">¿No tenés cuenta?</span> 
                     <button type="button" id="auth-switch-btn">Registrate</button>
-                </div>
+                </div> -->
             </div>
         </div>
 
     </div>
+
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log("Service Worker registrado con éxito"))
+        .catch((err) => console.log("Error al registrar Service Worker", err));
+    });
+  }
+</script>
 
     <!-- Script de autenticación que maneja la redirección -->
     <script type="module" src="./login.js"></script>
