@@ -70,16 +70,16 @@
     </div>
 
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(() => console.log("Service Worker registrado con éxito"))
-        .catch((err) => console.log("Error al registrar Service Worker", err));
-    });
-  }
-</script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(() => console.log("Service Worker registrado con éxito"))
+            .catch((err) => console.log("Error al registrar Service Worker", err));
+        });
+      }
+    </script>
 
-    <!-- Script de autenticación que maneja la redirección -->
+    <!-- Script principal de tu aplicación (Módulo) -->
     <script type="module" src="./login.js"></script>
 </body>
 </html>

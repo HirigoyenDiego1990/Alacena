@@ -8,147 +8,142 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="shurtcut icon" href="./img/alacena_icon_192x192.png">
+    <link rel="shortcut icon" href="./img/alacena_icon_192x192.png">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Enlace al Manifest -->
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#f97316">
+    <!-- Enlace al Manifest para hacerlo instalable -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#f97316">
 </head>
 <body>
     <div id="app">
-        
-            <header class="topbar">
-    <div class="brand">
-        <div class="brand-mark">
-    <img 
-        src="./img/alacena_icon_512x512.png" 
-        alt="Alacena - Zafá con lo que tenés" 
-        width="40" 
-        height="40"
-        style="
-            width: 40px; 
-            height: 40px; 
-            object-fit: contain;
-            display: block;
-            filter: drop-shadow(0 1px 2px rgba(31,42,34,0.08));
-        "
-    >
-</div>
-        <div class="brand-text-group">
-            <h1 class="brand-title">Alacena</h1>
-            <span class="brand-subtitle">Zafa con lo que hay</span>
-        </div>
-    </div>
-    
-    <button id="logout-btn" class="logout-pill-btn" title="Cerrar sesión">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
-        </svg>
-        <span>Salir</span>
-    </button>
-</header>
-
-            <main class="screen-pad" style="flex: 1;">
-                
-                <!-- Sub-vista: Cocinar / Ingredientes -->
-                <div id="view-cook" class="sub-view">
-                    <h2 class="section-title">¿Qué hay en tu cocina?</h2>
-                    <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que se te safen la comida.</p>
-
-                    <div class="ingredient-input-row">
-                        <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz, huevo...">
-                        <button type="button" id="add-ingredient-btn" class="add-btn" aria-label="Agregar ingrediente">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        </button>
-                    </div>
-
-                    <div id="ingredients-list" class="chip-cloud">
-                        <span class="empty-hint">Todavía no agregaste ingredientes...</span>
-                    </div>
-
-                    <div style="margin-bottom: 24px;">
-                        <button type="button" id="generate-btn" class="btn btn-primary">
-                            <span>Generar receta</span>
-                        </button>
-                    </div>
-
-                    <div id="recipes-container" class="recipe-list"></div>
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">
+                    <img 
+                        src="./img/alacena_icon_512x512.png" 
+                        alt="Alacena - Zafá con lo que tenés" 
+                        width="40" 
+                        height="40"
+                        style="
+                            width: 40px; 
+                            height: 40px; 
+                            object-fit: contain;
+                            display: block;
+                            filter: drop-shadow(0 1px 2px rgba(31,42,34,0.08));
+                        "
+                    >
                 </div>
-
-                <!-- Sub-vista: Recetas Guardadas -->
-                <div id="view-saved" class="sub-view hidden">
-                    <h2 class="section-title">Mis Favoritas</h2>
-                    <p class="section-sub">Tus recetas guardadas para cocinar cuando quieras.</p>
-                    <div id="saved-recipes-list" class="recipe-list"></div>
-                </div>
-
-                <!-- VISTA: MODO COCINA PASO A PASO -->
-        <div id="cooking-mode-view" class="view">
-            <div class="cooking-topbar">
-                <button type="button" id="close-cooking-btn" class="icon-btn">
-                    <i data-lucide="x"></i>
-                </button>
-                <div class="cooking-header-info">
-                    <span class="cooking-badge">Modo Cocina</span>
-                    <h2 id="cooking-recipe-title" class="cooking-title">Receta</h2>
-                </div>
-                <div style="width: 40px;"></div> <!-- Espaciador para centrar -->
-            </div>
-
-            <!-- TEMPORIZADOR INTEGRADO -->
-        <div class="cooking-timer-box">
-            <div class="timer-display-container">
-                <i data-lucide="timer" class="w-5 h-5 text-amber-400"></i>
-                <span id="cooking-timer-display" class="timer-display">00:00</span>
-            </div>
-            <div class="timer-controls">
-                <button type="button" class="timer-preset-btn" data-time="1">1 min</button>
-                <button type="button" class="timer-preset-btn" data-time="3">3 min</button>
-                <button type="button" class="timer-preset-btn" data-time="5">5 min</button>
-                <button type="button" class="timer-preset-btn" data-time="10">10 min</button>
-                <button type="button" id="timer-toggle-btn" class="timer-action-btn start">Iniciar</button>
-                <button type="button" id="timer-reset-btn" class="timer-action-btn reset" title="Reiniciar">
-                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-
-            <div class="cooking-content screen-pad">
-                <div class="cooking-progress-bar">
-                    <div id="cooking-progress-fill" style="width: 0%;"></div>
-                </div>
-                <p id="cooking-progress-text" class="cooking-progress-text">Paso 0 de 0 completados</p>
-
-                <!-- Contenedor dinámico de los pasos -->
-                <div id="cooking-steps-container" class="cooking-steps-list">
-                    <!-- Los pasos se inyectarán aquí mediante JS -->
+                <div class="brand-text-group">
+                    <h1 class="brand-title">Alacena</h1>
+                    <span class="brand-subtitle">Zafa con lo que hay</span>
                 </div>
             </div>
             
-        </div>
+            <button id="logout-btn" class="logout-pill-btn" title="Cerrar sesión">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Salir</span>
+            </button>
+        </header>
 
-            </main>
+        <main class="screen-pad" style="flex: 1;">
+            
+            <!-- Sub-vista: Cocinar / Ingredientes -->
+            <div id="view-cook" class="sub-view">
+                <h2 class="section-title">¿Qué hay en tu cocina?</h2>
+                <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
-            <!-- Barra de navegación inferior -->
-            <nav class="bottom-nav">
-                <button type="button" class="nav-btn active" data-target="cook">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                    <span>Cocinar</span>
-                </button>
-                
-                <button type="button" onclick="modoEmergencia()" class="nav-btn nav-btn-emergency" title="Modo Emergencia: Heladera Vacía">
-                    <span class="emergency-icon">🚨</span>
-                    <span>Heladera Vacía</span>
-                </button>
-                
-                <button type="button" id="tab-saved" class="nav-btn" data-target="saved">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
-                    <span>Guardadas</span>
-                </button>
-            </nav>
-        </div>
+                <div class="ingredient-input-row">
+                    <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz, huevo...">
+                    <button type="button" id="add-ingredient-btn" class="add-btn" aria-label="Agregar ingrediente">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                </div>
+
+                <div id="ingredients-list" class="chip-cloud">
+                    <span class="empty-hint">Todavía no agregaste ingredientes...</span>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <button type="button" id="generate-btn" class="btn btn-primary">
+                        <span>Generar receta</span>
+                    </button>
+                </div>
+
+                <div id="recipes-container" class="recipe-list"></div>
+            </div>
+
+            <!-- Sub-vista: Recetas Guardadas -->
+            <div id="view-saved" class="sub-view hidden">
+                <h2 class="section-title">Mis Favoritas</h2>
+                <p class="section-sub">Tus recetas guardadas para cocinar cuando quieras.</p>
+                <div id="saved-recipes-list" class="recipe-list"></div>
+            </div>
+
+            <!-- VISTA: MODO COCINA PASO A PASO -->
+            <div id="cooking-mode-view" class="view">
+                <div class="cooking-topbar">
+                    <button type="button" id="close-cooking-btn" class="icon-btn">
+                        <i data-lucide="x"></i>
+                    </button>
+                    <div class="cooking-header-info">
+                        <span class="cooking-badge">Modo Cocina</span>
+                        <h2 id="cooking-recipe-title" class="cooking-title">Receta</h2>
+                    </div>
+                    <div style="width: 40px;"></div>
+                </div>
+
+                <!-- TEMPORIZADOR INTEGRADO -->
+                <div class="cooking-timer-box">
+                    <div class="timer-display-container">
+                        <i data-lucide="timer" class="w-5 h-5 text-amber-400"></i>
+                        <span id="cooking-timer-display" class="timer-display">00:00</span>
+                    </div>
+                    <div class="timer-controls">
+                        <button type="button" class="timer-preset-btn" data-time="1">1 min</button>
+                        <button type="button" class="timer-preset-btn" data-time="3">3 min</button>
+                        <button type="button" class="timer-preset-btn" data-time="5">5 min</button>
+                        <button type="button" class="timer-preset-btn" data-time="10">10 min</button>
+                        <button type="button" id="timer-toggle-btn" class="timer-action-btn start">Iniciar</button>
+                        <button type="button" id="timer-reset-btn" class="timer-action-btn reset" title="Reiniciar">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cooking-content screen-pad">
+                    <div class="cooking-progress-bar">
+                        <div id="cooking-progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <p id="cooking-progress-text" class="cooking-progress-text">Paso 0 de 0 completados</p>
+
+                    <!-- Contenedor dinámico de los pasos -->
+                    <div id="cooking-steps-container" class="cooking-steps-list"></div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Barra de navegación inferior -->
+        <nav class="bottom-nav">
+            <button type="button" class="nav-btn active" data-target="cook">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span>Cocinar</span>
+            </button>
+            
+            <button type="button" onclick="modoEmergencia()" class="nav-btn nav-btn-emergency" title="Modo Emergencia: Heladera Vacía">
+                <span class="emergency-icon">🚨</span>
+                <span>Heladera Vacía</span>
+            </button>
+            
+            <button type="button" id="tab-saved" class="nav-btn" data-target="saved">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+                <span>Guardadas</span>
+            </button>
+        </nav>
     </div>
 
     <!-- Modal de Alertas -->
@@ -167,16 +162,18 @@
 
     <div id="toast-container"></div>
 
+    <!-- Script para registrar el Service Worker de la PWA -->
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(() => console.log("Service Worker registrado con éxito"))
-        .catch((err) => console.log("Error al registrar Service Worker", err));
-    });
-  }
-</script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(() => console.log("Service Worker registrado con éxito"))
+            .catch((err) => console.log("Error al registrar Service Worker", err));
+        });
+      }
+    </script>
 
+    <!-- Script principal de tu aplicación (Módulo) -->
     <script type="module" src="./app.js"></script>
 </body>
 </html>
