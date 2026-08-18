@@ -68,9 +68,9 @@ addIngredientBtn.addEventListener('click', async () => {
 
 function renderIngredients() {
     ingredientsList.innerHTML = userIngredients.map(item => `
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white border border-slate-200 text-slate-700 shadow-sm">
+        <span class="ingredient-chip">
             ${item.ingredient}
-            <button onclick="deleteIngredient('${item.id}')" class="ml-1.5 text-slate-400 hover:text-red-500">×</button>
+            <button onclick="deleteIngredient('${item.id}')" class="chip-delete-btn">×</button>
         </span>
     `).join('');
 }
@@ -110,7 +110,7 @@ window.cerrarModalAlerta = function() {
 }
 
 // Guardar Receta en Favoritos (Supabase)
-window.saveRecipe = async function(recipe) {
+window.saveRecipe = async function(recipe, event) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -127,6 +127,13 @@ window.saveRecipe = async function(recipe) {
         showAlert('Error', 'No se pudo guardar: ' + error.message, 'error');
     } else {
         showAlert('¡Guardada!', 'La receta se guardó en tus favoritas con éxito.', 'success');
+        // Pequeño pulso visual en el botón de guardar como confirmación extra
+        const btn = event && event.currentTarget;
+        if (btn) {
+            btn.classList.remove('saved-pulse');
+            void btn.offsetWidth; // fuerza reinicio de la animación si se guarda varias veces
+            btn.classList.add('saved-pulse');
+        }
     }
 }
 
@@ -184,9 +191,9 @@ async function ejecutarGeneracion() {
     }
 
     recipesContainer.innerHTML = `
-        <div class="text-center py-10">
-            <div class="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-            <p class="text-xs text-slate-400 font-medium">Cocinando ideas con IA...</p>
+        <div class="recipe-loading">
+            <div class="recipe-loading-spinner"></div>
+            <p class="recipe-loading-text">Cocinando ideas con IA...</p>
         </div>
     `;
 
@@ -217,26 +224,26 @@ try {
             const esSugerencia = recipe.type === 'sugerencia' || (recipe.missing_ingredients && recipe.missing_ingredients.length > 0);
 
             const badgeHTML = esSugerencia 
-                ? `<div class="mb-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs px-2.5 py-1 rounded-md font-medium flex items-center gap-1.5">
+                ? `<div class="recipe-badge recipe-badge--missing">
                    <span>🛒 Falta comprar:</span> <strong>${recipe.missing_ingredients.join(', ')}</strong>
                    </div>`
-                : `<div class="mb-2 inline-block bg-emerald-50 text-emerald-600 text-xs px-2.5 py-1 rounded-md font-medium">
+                : `<div class="recipe-badge recipe-badge--success">
                     ✨ 100% con tu alacena
                    </div>`;
 
             const botonWhatsApp = esSugerencia && recipe.missing_ingredients && recipe.missing_ingredients.length > 0
                 ? `<button onclick='enviarPorWhatsApp(${JSON.stringify(recipe.title)}, ${JSON.stringify(recipe.missing_ingredients)})' class="btn-whatsapp">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                      Enviar faltantes por WhatsApp
                    </button>`
                 : '';
 
             const chefTipHTML = recipe.chef_tip 
-                ? `<div class="bg-amber-50/60 p-3 rounded-xl border border-amber-100 text-xs text-amber-900 flex items-start gap-2">
-                        <span class="text-base">🌱</span>
+                ? `<div class="chef-tip-box">
+                        <span class="chef-tip-icon">🌱</span>
                         <div>
-                            <strong class="font-semibold block mb-0.5">Toque del Chef:</strong>
-                            <p class="italic">${recipe.chef_tip}</p>
+                            <strong class="chef-tip-label">Toque del Chef:</strong>
+                            <p class="chef-tip-text">${recipe.chef_tip}</p>
                         </div>
                    </div>`
                 : '';
@@ -246,26 +253,24 @@ try {
             const pasosArray = parsearPasos(recipe.instructions);
 
             return `
-                <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3 relative recipe-card-container">
-                    <button onclick='saveRecipe(${JSON.stringify(recipe)})' class="recipe-action-btn btn-save" title="Guardar receta">
-                        <i data-lucide="bookmark" class="w-4 h-4"></i>
+                <div class="recipe-card-container">
+                    <button onclick='saveRecipe(${JSON.stringify(recipe)}, event)' class="recipe-action-btn btn-save" title="Guardar receta">
+                        <i data-lucide="bookmark"></i>
                     </button>
                     <div>
-                        <h3 class="font-bold text-slate-800 text-base pr-8 recipe-card-title">${recipe.title}</h3>
+                        <h3 class="recipe-card-title">${recipe.title}</h3>
                     </div>
                     ${badgeHTML}
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="bg-orange-50 text-orange-600 px-2.5 py-1 rounded-md font-medium">${recipe.time}</span>
-                        <span class="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-medium">${recipe.difficulty}</span>
+                    <div class="recipe-meta-row">
+                        <span class="recipe-pill recipe-pill--time">${recipe.time}</span>
+                        <span class="recipe-pill recipe-pill--difficulty">${recipe.difficulty}</span>
                     </div>
-                    <p class="text-slate-600 text-xs leading-relaxed bg-slate-50 p-3 rounded-xl">${recipe.instructions}</p>
-                    
-                    
+                    <p class="recipe-instructions">${recipe.instructions}</p>
 
                     ${chefTipHTML}
                     <!-- Botón para disparar el Modo Cocina -->
                     <button type="button" class="btn-cook-today btn-abrir-cocina" data-title="${encodeURIComponent(recipe.title)}" data-steps="${encodeURIComponent(JSON.stringify(pasosArray))}">
-                    <i data-lucide="chef-hat" class="w-4 h-4"></i>
+                    <i data-lucide="chef-hat"></i>
                     <span>👨‍🍳 Cocinar Paso a Paso</span>
                     </button>
                     ${botonWhatsApp}
@@ -319,20 +324,20 @@ async function loadSavedRecipes() {
     
     if (data && data.length > 0) {
         container.innerHTML = data.map(recipe => `
-            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3 recipe-card-container">
+            <div class="recipe-card-container">
                 <button onclick="deleteRecipe('${recipe.id}', event)" class="recipe-action-btn btn-delete" title="Eliminar receta">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <i data-lucide="trash-2"></i>
                 </button>
                 <div>
-                    <h3 class="font-bold text-slate-800 recipe-card-title">${recipe.title}</h3>
+                    <h3 class="recipe-card-title">${recipe.title}</h3>
                 </div>
-                <div class="flex items-center justify-between text-xs text-slate-500">
+                <div class="saved-recipe-meta">
                     <span>Tiempo: ${recipe.time} | Dificultad: ${recipe.difficulty}</span>
-                    <span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-medium">
+                    <span class="cooked-badge">
                         🍳 Cocinada: <strong>${recipe.times_cooked || 0}</strong> veces
                     </span>
                 </div>
-                <p class="text-slate-600 text-xs bg-slate-50 p-3 rounded-xl italic">
+                <p class="recipe-instructions recipe-instructions--italic">
                     ${recipe.steps ? recipe.steps.join(' ') : 'Sin pasos guardados'}
                 </p>
                 <button onclick="marcarCocinada('${recipe.id}', ${recipe.times_cooked || 0})" class="btn-cook-today">
@@ -342,7 +347,7 @@ async function loadSavedRecipes() {
         `).join('');
         lucide.createIcons();
     } else {
-        container.innerHTML = '<p class="text-center text-slate-400 text-sm py-10">Aún no guardaste ninguna receta.</p>';
+        container.innerHTML = '<p class="empty-state">Aún no guardaste ninguna receta.</p>';
     }
 }
 
@@ -449,9 +454,17 @@ function actualizarProgresoCocina() {
     const completados = document.querySelectorAll('.cooking-step-card.completed').length;
     
     const porcentaje = total > 0 ? (completados / total) * 100 : 0;
-    
-    document.getElementById('cooking-progress-fill').style.width = `${porcentaje}%`;
-    document.getElementById('cooking-progress-text').textContent = `Paso ${completados} de ${total} completados`;
+    const fillEl = document.getElementById('cooking-progress-fill');
+    const textEl = document.getElementById('cooking-progress-text');
+
+    fillEl.style.width = `${porcentaje}%`;
+
+    const todoListo = total > 0 && completados === total;
+    fillEl.classList.toggle('all-done', todoListo);
+    textEl.classList.toggle('all-done', todoListo);
+    textEl.textContent = todoListo
+        ? `¡Listo! ${total} de ${total} pasos completados 🎉`
+        : `Paso ${completados} de ${total} completados`;
 }
 
 // Botón para cerrar el modo cocina
@@ -525,6 +538,9 @@ function toggleTimer() {
         isTimerRunning = true;
         toggleBtn.textContent = 'Pausar';
         toggleBtn.classList.add('running');
+
+        const cajaTimer = document.querySelector('.cooking-timer-box');
+        if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
         
         timerInterval = setInterval(() => {
             if (timeLeftSeconds > 0) {
@@ -539,6 +555,10 @@ function toggleTimer() {
                 // Efecto visual y vibración inicial
                 if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
                 
+                // Resalta visualmente la caja del timer mientras suena la alarma
+                const cajaTimer = document.querySelector('.cooking-timer-box');
+                if (cajaTimer) cajaTimer.classList.add('timer-alarm');
+
                 // ¡Sonar sin parar cada 400ms hasta que el usuario lo detenga!
                 reproducirPitidoAlarma();
                 if (alarmaInterval) clearInterval(alarmaInterval);
@@ -577,5 +597,7 @@ if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
             toggleBtn.textContent = 'Iniciar';
             toggleBtn.classList.remove('running');
         }
+        const cajaTimer = document.querySelector('.cooking-timer-box');
+        if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
     }
 });
