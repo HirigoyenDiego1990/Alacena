@@ -130,6 +130,32 @@ window.saveRecipe = async function(recipe) {
     }
 }
 
+// Convierte el texto de instrucciones de la IA en un array de pasos limpios.
+// Soporta tanto recetas numeradas/con viñetas (una por línea) como texto corrido.
+function parsearPasos(instructions) {
+    if (typeof instructions !== 'string') return [instructions];
+
+    const texto = instructions.trim();
+    const lineas = texto.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+
+    // Si cada línea empieza con numeración ("1.", "2)") o viñeta ("-", "*", "•"),
+    // es una receta ya estructurada por línea: separamos por línea y sacamos el prefijo.
+    const prefijoPaso = /^(\d+[\.\)]|[-*•])\s*/;
+    const pareceEstructurada = lineas.length > 1 && lineas.every(l => prefijoPaso.test(l));
+
+    if (pareceEstructurada) {
+        return lineas.map(l => l.replace(prefijoPaso, '').trim()).filter(p => p.length > 0);
+    }
+
+    // Si hay varias líneas pero no están numeradas, respetamos esas líneas tal cual.
+    if (lineas.length > 1) {
+        return lineas;
+    }
+
+    // Texto corrido en un solo bloque: separamos por oraciones.
+    return texto.split(/\.\s+/).map(p => p.trim()).filter(p => p.length > 0);
+}
+
 // Función global para limpiar/reiniciar las recetas generadas
 window.resetearRecetas = function() {
     recipesContainer.innerHTML = '';
@@ -203,9 +229,7 @@ try {
 
             // Convertimos las instrucciones en array (separando por puntos o saltos de línea para el modo cocina)
             // Si la IA manda un texto largo, esto lo divide en pasos limpios
-            const pasosArray = typeof recipe.instructions === 'string' 
-                ? recipe.instructions.split(/\.\s+|\n+/).filter(p => p.trim().length > 0)
-                : [recipe.instructions];
+            const pasosArray = parsearPasos(recipe.instructions);
 
             return `
                 <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3 relative recipe-card-container">
