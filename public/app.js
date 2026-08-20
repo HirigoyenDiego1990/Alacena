@@ -422,11 +422,14 @@ function abrirModoCocina(tituloReceta, pasosArray) {
     const pasosLimpios = Array.isArray(pasosArray) 
         ? pasosArray.map(p => typeof p === 'string' ? p.trim() : p).filter(p => p && p.length > 0)
         : [];
+    const progresoKey = obtenerClaveProgresoCocina(tituloReceta, pasosLimpios);
+    const pasosCompletados = obtenerProgresoCocina(progresoKey);
 
     // Generar las tarjetas de pasos dinámicamente solo con los pasos limpios
     pasosLimpios.forEach((paso, index) => {
         const stepCard = document.createElement('div');
         stepCard.className = 'cooking-step-card';
+        stepCard.classList.toggle('completed', Boolean(pasosCompletados[index]));
         stepCard.innerHTML = `
             <div class="cooking-step-number">${index + 1}</div>
             <div class="cooking-step-text">${paso}</div>
@@ -435,6 +438,7 @@ function abrirModoCocina(tituloReceta, pasosArray) {
         // Evento para marcar/desmarcar el paso al tocarlo
         stepCard.addEventListener('click', () => {
             stepCard.classList.toggle('completed');
+            guardarProgresoCocina(progresoKey, container);
             actualizarProgresoCocina();
         });
 
@@ -446,6 +450,27 @@ function abrirModoCocina(tituloReceta, pasosArray) {
     // Mostrar la vista de modo cocina
     vistaCocina.classList.add('active');
     if (window.lucide) lucide.createIcons();
+}
+
+const COOKING_PROGRESS_STORAGE_PREFIX = 'alacena.cookingProgress.v1.';
+
+function obtenerClaveProgresoCocina(tituloReceta, pasos) {
+    return `${COOKING_PROGRESS_STORAGE_PREFIX}${encodeURIComponent(JSON.stringify([tituloReceta, pasos]))}`;
+}
+
+function obtenerProgresoCocina(clave) {
+    try {
+        const progreso = JSON.parse(localStorage.getItem(clave));
+        return Array.isArray(progreso) ? progreso : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function guardarProgresoCocina(clave, container) {
+    const progreso = [...container.querySelectorAll('.cooking-step-card')]
+        .map(paso => paso.classList.contains('completed'));
+    localStorage.setItem(clave, JSON.stringify(progreso));
 }
 
 // Función para actualizar la barra de progreso interna
@@ -486,6 +511,8 @@ document.addEventListener('click', (e) => {
 let timerInterval = null;
 let timeLeftSeconds = 0;
 let isTimerRunning = false;
+let timerEndTimestamp = null;
+const TIMER_STORAGE_KEY = 'alacena.cookingTimer.v1';
 
 // Actualiza el texto en pantalla del timer
 function actualizarDisplayTimer() {
@@ -495,6 +522,85 @@ function actualizarDisplayTimer() {
     
     const displayEl = document.getElementById('cooking-timer-display');
     if (displayEl) displayEl.textContent = displayStr;
+}
+
+function guardarTimer() {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({
+        timeLeftSeconds,
+        isTimerRunning,
+        timerEndTimestamp
+    }));
+}
+
+function sincronizarTimerConHoraActual() {
+    if (!isTimerRunning || !timerEndTimestamp) return false;
+
+    timeLeftSeconds = Math.max(0, Math.ceil((timerEndTimestamp - Date.now()) / 1000));
+    return timeLeftSeconds === 0;
+}
+
+function actualizarBotonTimer() {
+    const toggleBtn = document.getElementById('timer-toggle-btn');
+    if (!toggleBtn) return;
+
+    toggleBtn.textContent = isTimerRunning ? 'Pausar' : (timeLeftSeconds > 0 ? 'Reanudar' : 'Iniciar');
+    toggleBtn.classList.toggle('running', isTimerRunning);
+}
+
+function finalizarTimer() {
+    clearInterval(timerInterval);
+    isTimerRunning = false;
+    timerEndTimestamp = null;
+    timeLeftSeconds = 0;
+    guardarTimer();
+    actualizarDisplayTimer();
+    actualizarBotonTimer();
+
+    // Efecto visual y vibración inicial
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
+
+    const cajaTimer = document.querySelector('.cooking-timer-box');
+    if (cajaTimer) cajaTimer.classList.add('timer-alarm');
+
+    reproducirPitidoAlarma();
+    if (alarmaInterval) clearInterval(alarmaInterval);
+    alarmaInterval = setInterval(reproducirPitidoAlarma, 400);
+
+    showAlert('⏰ ¡Tiempo cumplido!', 'El temporizador de cocina ha finalizado. Presiona reiniciar o cambiar tiempo para apagar la alarma.', 'warning');
+}
+
+function iniciarActualizacionTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        if (sincronizarTimerConHoraActual()) {
+            finalizarTimer();
+        } else {
+            actualizarDisplayTimer();
+            guardarTimer();
+        }
+    }, 1000);
+}
+
+function restaurarTimer() {
+    try {
+        const timerGuardado = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY));
+        if (!timerGuardado) return;
+
+        timeLeftSeconds = Number(timerGuardado.timeLeftSeconds) || 0;
+        isTimerRunning = Boolean(timerGuardado.isTimerRunning);
+        timerEndTimestamp = Number(timerGuardado.timerEndTimestamp) || null;
+
+        if (sincronizarTimerConHoraActual()) {
+            finalizarTimer();
+            return;
+        }
+
+        actualizarDisplayTimer();
+        actualizarBotonTimer();
+        if (isTimerRunning) iniciarActualizacionTimer();
+    } catch (error) {
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+    }
 }
 
 // Iniciar o pausar el timer
@@ -525,48 +631,26 @@ function reproducirPitidoAlarma() {
 }
 
 function toggleTimer() {
-    const toggleBtn = document.getElementById('timer-toggle-btn');
-    
     if (isTimerRunning) {
+        sincronizarTimerConHoraActual();
         clearInterval(timerInterval);
         isTimerRunning = false;
-        toggleBtn.textContent = 'Reanudar';
-        toggleBtn.classList.remove('running');
+        timerEndTimestamp = null;
+        guardarTimer();
+        actualizarDisplayTimer();
+        actualizarBotonTimer();
     } else {
         if (timeLeftSeconds <= 0) return;
         
         isTimerRunning = true;
-        toggleBtn.textContent = 'Pausar';
-        toggleBtn.classList.add('running');
+        timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
+        guardarTimer();
+        actualizarBotonTimer();
 
         const cajaTimer = document.querySelector('.cooking-timer-box');
         if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
         
-        timerInterval = setInterval(() => {
-            if (timeLeftSeconds > 0) {
-                timeLeftSeconds--;
-                actualizarDisplayTimer();
-            } else {
-                clearInterval(timerInterval);
-                isTimerRunning = false;
-                toggleBtn.textContent = 'Iniciar';
-                toggleBtn.classList.remove('running');
-                
-                // Efecto visual y vibración inicial
-                if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
-                
-                // Resalta visualmente la caja del timer mientras suena la alarma
-                const cajaTimer = document.querySelector('.cooking-timer-box');
-                if (cajaTimer) cajaTimer.classList.add('timer-alarm');
-
-                // ¡Sonar sin parar cada 400ms hasta que el usuario lo detenga!
-                reproducirPitidoAlarma();
-                if (alarmaInterval) clearInterval(alarmaInterval);
-                alarmaInterval = setInterval(reproducirPitidoAlarma, 400);
-
-                showAlert('⏰ ¡Tiempo cumplido!', 'El temporizador de cocina ha finalizado. Presiona reiniciar o cambiar tiempo para apagar la alarma.', 'warning');
-            }
-        }, 1000);
+        iniciarActualizacionTimer();
     }
 }
 
@@ -575,7 +659,10 @@ document.addEventListener('click', (e) => {
     // Botones de minutos predeterminados (+1, +3, +5, +10)
     if (e.target.classList.contains('timer-preset-btn')) {
         const minutesToAdd = parseInt(e.target.getAttribute('data-time'), 10);
+        sincronizarTimerConHoraActual();
         timeLeftSeconds += minutesToAdd * 60;
+        if (isTimerRunning) timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
+        guardarTimer();
         actualizarDisplayTimer();
     }
     
@@ -591,6 +678,8 @@ if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
     clearInterval(alarmaInterval); // <--- Esto detiene el sonido sin parar
     isTimerRunning = false;
     timeLeftSeconds = 0;
+    timerEndTimestamp = null;
+    guardarTimer();
     actualizarDisplayTimer();
         const toggleBtn = document.getElementById('timer-toggle-btn');
         if (toggleBtn) {
@@ -601,3 +690,15 @@ if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
         if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
     }
 });
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (sincronizarTimerConHoraActual()) {
+        finalizarTimer();
+    } else {
+        actualizarDisplayTimer();
+        guardarTimer();
+    }
+});
+
+restaurarTimer();
