@@ -53,12 +53,23 @@
             
             <!-- Sub-vista: Cocinar / Ingredientes -->
             <div id="view-cook" class="sub-view">
-                <!-- Agregá esto en tu index.html donde quieras que aparezca el acceso rápido -->
-<div id="btn-resume-cooking" class="hidden">
-    <span>👨‍🍳 Continuar cocinando: <strong id="cooking-resume-title"></strong></span>
-</div>
-                <h2 class="section-title">¿Qué hay en tu cocina?</h2>
-                <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
+    
+    <!-- Banner de recuperación de Modo Cocina -->
+    <div id="btn-resume-cooking" class="resume-cooking-banner hidden">
+        <div class="resume-cooking-content">
+            <span class="resume-icon">👨‍🍳</span>
+            <div class="resume-text">
+                <small class="resume-tag">Tienes una receta en curso</small>
+                <strong id="cooking-resume-title">Nombre de la receta</strong>
+            </div>
+        </div>
+        <button type="button" class="btn-resume-action">
+            Continuar
+        </button>
+    </div>
+
+    <h2 class="section-title">¿Qué hay en tu cocina?</h2>
+    <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
                 <div class="ingredient-input-row">
                     <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz, huevo...">
