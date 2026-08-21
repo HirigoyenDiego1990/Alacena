@@ -709,7 +709,7 @@ restaurarTimer();
 (function() {
     const CLAVE_COCINA = 'alacena.activeCookingSession.v1';
 
-    // 1. Escuchar CUALQUIER clic en botones "Cocinar Paso a Paso"
+    // 1. Guardar receta al abrir
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-abrir-cocina');
         if (!btn) return;
@@ -718,7 +718,6 @@ restaurarTimer();
             const title = decodeURIComponent(btn.getAttribute('data-title'));
             const steps = JSON.parse(decodeURIComponent(btn.getAttribute('data-steps')));
 
-            // Guardar respaldo inmediato
             localStorage.setItem(CLAVE_COCINA, JSON.stringify({ title, steps }));
             actualizarBotonRecuperar();
         } catch (err) {
@@ -726,7 +725,7 @@ restaurarTimer();
         }
     });
 
-    // 2. Controlar si el botón verde de recuperar debe verse u ocultarse
+    // 2. Controlar visibilidad del widget
     function actualizarBotonRecuperar() {
         const btnResume = document.getElementById('btn-resume-cooking');
         const labelTitle = document.getElementById('cooking-resume-title');
@@ -743,33 +742,41 @@ restaurarTimer();
                 btnResume.classList.add('hidden');
             }
         } else {
-            btnResume.classList.add('hidden'); // Oculta el botón si la receta terminó
+            btnResume.classList.add('hidden');
         }
     }
 
-    // 3. Borrar la sesión cuando el usuario MARCA TODOS los pasos o termina la receta
-    document.addEventListener('change', (e) => {
-        // Si el elemento modificado es un checkbox dentro de la vista de cocina
-        if (e.target.matches('#cooking-steps-container input[type="checkbox"]')) {
-            const checkboxes = document.querySelectorAll('#cooking-steps-container input[type="checkbox"]');
-            const todosCompletados = Array.from(checkboxes).length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+    // 3. Borrar sesión al completar TODOS los pasos o al presionar botones de cierre/finalizar
+    document.addEventListener('click', (e) => {
+        // Detecta clics en checkboxes o botones de finalización / cierre
+        const esCheckbox = e.target.matches('#cooking-steps-container input[type="checkbox"]');
+        const esBotonFinal = e.target.closest('#finish-cooking-btn, .btn-finalizar-cocina, #close-cooking-btn');
 
-            if (todosCompletados) {
+        if (esCheckbox) {
+            setTimeout(() => {
+                const checkboxes = document.querySelectorAll('#cooking-steps-container input[type="checkbox"]');
+                const todosCompletados = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+
+                if (todosCompletados) {
+                    localStorage.removeItem(CLAVE_COCINA);
+                    actualizarBotonRecuperar();
+                }
+            }, 50);
+        }
+
+        if (esBotonFinal) {
+            // Si hace clic en terminar receta o cerrar, verificamos si completó todo
+            const checkboxes = document.querySelectorAll('#cooking-steps-container input[type="checkbox"]');
+            const todosCompletados = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+
+            if (todosCompletados || e.target.closest('#finish-cooking-btn, .btn-finalizar-cocina')) {
                 localStorage.removeItem(CLAVE_COCINA);
                 actualizarBotonRecuperar();
             }
         }
     });
 
-    // 4. Limpiar también si el usuario presiona un botón de "Finalizar Receta" o "Terminar"
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('#finish-cooking-btn') || e.target.closest('.btn-finalizar-cocina')) {
-            localStorage.removeItem(CLAVE_COCINA);
-            actualizarBotonRecuperar();
-        }
-    });
-
-    // 5. Reabrir la receta si el usuario presiona el botón verde de recuperar
+    // 4. Reabrir receta guardada
     document.addEventListener('click', (e) => {
         const btnResume = e.target.closest('#btn-resume-cooking');
         if (!btnResume) return;
@@ -786,13 +793,6 @@ restaurarTimer();
             }
         } catch (err) {
             console.error('Error al reabrir modo cocina:', err);
-        }
-    });
-
-    // 6. Actualizar visibilidad al cerrar la pantalla o recargar la app
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('#close-cooking-btn')) {
-            setTimeout(actualizarBotonRecuperar, 100);
         }
     });
 
