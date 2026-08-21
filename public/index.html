@@ -53,6 +53,18 @@
             
             <!-- Sub-vista: Cocinar / Ingredientes -->
             <div id="view-cook" class="sub-view">
+
+                <!-- Botón dinámico para reanudar el Modo Cocina si hay una sesión activa -->
+                <button type="button" id="btn-resume-cooking" class="btn-resume-cooking hidden">
+                    <div class="resume-content">
+                        <span>👨‍🍳</span>
+                        <div>
+                            <strong>Volver al Modo Cocina Activo</strong>
+                            <span id="cooking-resume-title" class="resume-title"></span>
+                        </div>
+                    </div>
+                    <span>▶</span>
+                </button>
                 <h2 class="section-title">¿Qué hay en tu cocina?</h2>
                 <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
@@ -144,23 +156,6 @@
                 <span>Guardadas</span>
             </button>
         </nav>
-
-        <!-- Banner flotante para retomar el Modo Cocina si quedó una receta en curso -->
-        <div id="resume-cooking-banner" class="resume-cooking-banner hidden">
-            <div class="resume-cooking-info">
-                <i data-lucide="chef-hat"></i>
-                <div>
-                    <span class="resume-cooking-label">Cocina en curso</span>
-                    <span id="resume-cooking-title" class="resume-cooking-title">Receta</span>
-                </div>
-            </div>
-            <div class="resume-cooking-actions">
-                <button type="button" id="resume-cooking-btn" class="resume-cooking-btn">Volver</button>
-                <button type="button" id="dismiss-cooking-btn" class="resume-cooking-dismiss" aria-label="Descartar aviso">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-        </div>
     </div>
 
     <!-- Modal de Alertas -->
