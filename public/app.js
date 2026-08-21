@@ -808,3 +808,44 @@ restaurarTimer();
 
     window.addEventListener('load', actualizarBotonRecuperar);
 })();
+
+// =========================================================
+// PERSISTENCIA DE RECETAS EN PANTALLA (PREVIENE PÉRDIDA)
+// =========================================================
+(function() {
+    const CLAVE_RECETAS_PANTALLA = 'alacena.recetasEnPantalla.v1';
+
+    // 1. Guardar el HTML del contenedor de recetas cada vez que cambia
+    const observarRecetas = () => {
+        const contenedor = document.getElementById('recipes-container') || document.getElementById('view-cook');
+        if (!contenedor) return;
+
+        const observer = new MutationObserver(() => {
+            if (contenedor.children.length > 0) {
+                localStorage.setItem(CLAVE_RECETAS_PANTALLA, contenedor.innerHTML);
+            }
+        });
+
+        observer.observe(contenedor, { childList: true, subtree: true });
+    };
+
+    // 2. Restaurar las recetas al cargar si el usuario no tocó "Generar nuevas"
+    window.addEventListener('load', () => {
+        const contenedor = document.getElementById('recipes-container') || document.getElementById('view-cook');
+        const guardadas = localStorage.getItem(CLAVE_RECETAS_PANTALLA);
+
+        if (contenedor && guardadas && contenedor.children.length === 0) {
+            contenedor.innerHTML = guardadas;
+            if (window.lucide) lucide.createIcons();
+        }
+        observarRecetas();
+    });
+
+    // 3. Borrar las recetas guardadas SOLO cuando toca "Generar nuevas recetas"
+    document.addEventListener('click', (e) => {
+        const btnGenerar = e.target.closest('#btn-generate-recipes, .btn-generar-recetas');
+        if (btnGenerar) {
+            localStorage.removeItem(CLAVE_RECETAS_PANTALLA);
+        }
+    });
+})();
