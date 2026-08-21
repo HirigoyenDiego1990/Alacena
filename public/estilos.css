@@ -300,25 +300,27 @@ button[type="submit"]:hover {
   transform: scale(0.92);
 }
 
-/* Widget minimalista de recuperación */
+/* Widget de Recuperación de Modo Cocina */
 .resume-widget {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-left: 4px solid #3b82f6; /* Accent azul sutil */
-    padding: 10px 14px;
-    border-radius: 8px;
+    background-color: var(--paper-dim);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--saffron);
+    padding: 12px 16px;
+    border-radius: var(--r-md);
     margin-bottom: 20px;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(31, 42, 34, 0.08);
     transition: all 0.2s ease;
 }
 
 .resume-widget:hover {
-    background-color: #f1f3f5;
-    border-color: #dee2e6;
-    border-left-color: #2563eb;
+    background-color: var(--paper);
+    border-left-color: var(--saffron-deep);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card);
 }
 
 .resume-widget.hidden {
@@ -333,29 +335,32 @@ button[type="submit"]:hover {
 }
 
 .resume-badge {
-    background-color: #e0f2fe;
-    color: #0369a1;
+    background-color: var(--saffron);
+    color: var(--ink);
+    font-family: var(--font-mono);
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    padding: 3px 7px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
     white-space: nowrap;
 }
 
 .resume-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #334155;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .resume-action-btn {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #2563eb;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--saffron-deep);
     white-space: nowrap;
     margin-left: 12px;
 }

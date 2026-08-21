@@ -704,12 +704,23 @@ document.addEventListener('visibilitychange', () => {
 restaurarTimer();
 
 // =========================================================
-// MÓDULO AISLADO: RECUPERACIÓN DE MODO COCINA (PARA CONCURSO)
+// MÓDULO AISLADO: RECUPERACIÓN DE MODO COCINA (CORREGIDO)
 // =========================================================
 (function() {
     const CLAVE_COCINA = 'alacena.activeCookingSession.v1';
 
-    // 1. Guardar receta al abrir
+    function guardarSesion(title, steps) {
+        if (!title || !steps) return;
+        localStorage.setItem(CLAVE_COCINA, JSON.stringify({ title, steps }));
+        actualizarBotonRecuperar();
+    }
+
+    function borrarSesion() {
+        localStorage.removeItem(CLAVE_COCINA);
+        actualizarBotonRecuperar();
+    }
+
+    // 1. Guardar receta al abrir normalmente desde las tarjetas
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-abrir-cocina');
         if (!btn) return;
@@ -717,15 +728,13 @@ restaurarTimer();
         try {
             const title = decodeURIComponent(btn.getAttribute('data-title'));
             const steps = JSON.parse(decodeURIComponent(btn.getAttribute('data-steps')));
-
-            localStorage.setItem(CLAVE_COCINA, JSON.stringify({ title, steps }));
-            actualizarBotonRecuperar();
+            guardarSesion(title, steps);
         } catch (err) {
             console.warn('Error al respaldar receta activa:', err);
         }
     });
 
-    // 2. Controlar visibilidad del widget
+    // 2. Controlar visibilidad del widget de recuperación
     function actualizarBotonRecuperar() {
         const btnResume = document.getElementById('btn-resume-cooking');
         const labelTitle = document.getElementById('cooking-resume-title');
@@ -746,37 +755,37 @@ restaurarTimer();
         }
     }
 
-    // 3. Borrar sesión al completar TODOS los pasos o al presionar botones de cierre/finalizar
+    // 3. Monitorear cuando se completan las tarjetas de pasos (.cooking-step-card)
     document.addEventListener('click', (e) => {
-        // Detecta clics en checkboxes o botones de finalización / cierre
-        const esCheckbox = e.target.matches('#cooking-steps-container input[type="checkbox"]');
-        const esBotonFinal = e.target.closest('#finish-cooking-btn, .btn-finalizar-cocina, #close-cooking-btn');
+        const stepCard = e.target.closest('.cooking-step-card');
+        const btnCerrar = e.target.closest('#close-cooking-btn, #finish-cooking-btn, .btn-finalizar-cocina');
 
-        if (esCheckbox) {
+        // Si tocó un paso, verificamos después de que tu función nativa alterne la clase .completed
+        if (stepCard) {
             setTimeout(() => {
-                const checkboxes = document.querySelectorAll('#cooking-steps-container input[type="checkbox"]');
-                const todosCompletados = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+                const tarjetas = document.querySelectorAll('.cooking-step-card');
+                const completadas = document.querySelectorAll('.cooking-step-card.completed');
 
-                if (todosCompletados) {
-                    localStorage.removeItem(CLAVE_COCINA);
-                    actualizarBotonRecuperar();
+                if (tarjetas.length > 0 && tarjetas.length === completadas.length) {
+                    borrarSesion();
                 }
             }, 50);
         }
 
-        if (esBotonFinal) {
-            // Si hace clic en terminar receta o cerrar, verificamos si completó todo
-            const checkboxes = document.querySelectorAll('#cooking-steps-container input[type="checkbox"]');
-            const todosCompletados = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+        // Si toca el botón de cerrar o finalizar
+        if (btnCerrar) {
+            const tarjetas = document.querySelectorAll('.cooking-step-card');
+            const completadas = document.querySelectorAll('.cooking-step-card.completed');
 
-            if (todosCompletados || e.target.closest('#finish-cooking-btn, .btn-finalizar-cocina')) {
-                localStorage.removeItem(CLAVE_COCINA);
+            if ((tarjetas.length > 0 && tarjetas.length === completadas.length) || e.target.closest('#finish-cooking-btn, .btn-finalizar-cocina')) {
+                borrarSesion();
+            } else {
                 actualizarBotonRecuperar();
             }
         }
     });
 
-    // 4. Reabrir receta guardada
+    // 4. Reabrir receta guardada desde el widget
     document.addEventListener('click', (e) => {
         const btnResume = e.target.closest('#btn-resume-cooking');
         if (!btnResume) return;
@@ -791,6 +800,7 @@ restaurarTimer();
             } else if (typeof abrirModoCocina === 'function') {
                 abrirModoCocina(title, steps);
             }
+            actualizarBotonRecuperar();
         } catch (err) {
             console.error('Error al reabrir modo cocina:', err);
         }
