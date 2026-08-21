@@ -411,11 +411,16 @@ window.marcarCocinada = async function(recipeId, currentCount) {
 
 // Función para abrir el Modo Cocina con los pasos de la receta
 function abrirModoCocina(tituloReceta, pasosArray) {
-    // Dentro de tu función abrirModoCocina actual:
+    // 1. Guardamos la sesión en localStorage apenas se entra a la receta
     guardarSesionCocinaActiva(tituloReceta, pasosArray);
+
+    // 2. Obtenemos los elementos de la vista
     const vistaCocina = document.getElementById('cooking-mode-view');
     const tituloEl = document.getElementById('cooking-recipe-title');
     const container = document.getElementById('cooking-steps-container');
+
+    // ... el resto de tu función sigue exactamente igual acá abajo ...
+
     
     tituloEl.textContent = tituloReceta;
     container.innerHTML = '';
