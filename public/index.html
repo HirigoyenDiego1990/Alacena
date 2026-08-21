@@ -144,6 +144,70 @@
                 <span>Guardadas</span>
             </button>
         </nav>
+
+        <!-- Banner flotante para retomar el Modo Cocina si quedó una receta en curso -->
+        <div id="resume-cooking-banner" class="resume-cooking-banner hidden">
+            <div class="resume-cooking-info">
+                <i data-lucide="chef-hat"></i>
+                <div>
+                    <span class="resume-cooking-label">Cocina en curso</span>
+                    <span id="resume-cooking-title" class="resume-cooking-title">Receta</span>
+                </div>
+            </div>
+            <div class="resume-cooking-actions">
+                <button type="button" id="resume-cooking-btn" class="resume-cooking-btn">Volver</button>
+                <button type="button" id="dismiss-cooking-btn" class="resume-cooking-dismiss" aria-label="Descartar aviso">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <style>
+            .resume-cooking-banner {
+                position: fixed;
+                left: 16px;
+                right: 16px;
+                bottom: 84px;
+                z-index: 40;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                background: #2a2118;
+                border: 1px solid rgba(232, 163, 61, 0.35);
+                border-radius: 16px;
+                padding: 12px 14px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+                animation: resumeBannerIn 0.25s ease-out;
+            }
+            .resume-cooking-banner.hidden { display: none; }
+            .resume-cooking-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+            .resume-cooking-info svg { width: 20px; height: 20px; color: #e8a33d; flex-shrink: 0; }
+            .resume-cooking-info > div { display: flex; flex-direction: column; min-width: 0; }
+            .resume-cooking-label {
+                font-size: 11px; font-weight: 600; text-transform: uppercase;
+                letter-spacing: 0.04em; color: rgba(243, 239, 226, 0.55);
+            }
+            .resume-cooking-title {
+                font-size: 13.5px; font-weight: 700; color: #f3efe2;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw;
+            }
+            .resume-cooking-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+            .resume-cooking-btn {
+                background: #e8a33d; color: #1f2a22; border: none; font-weight: 700;
+                font-size: 12.5px; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+            }
+            .resume-cooking-dismiss {
+                background: rgba(251, 246, 236, 0.06); border: 1px solid rgba(251, 246, 236, 0.1);
+                color: rgba(243, 239, 226, 0.6); width: 30px; height: 30px; border-radius: 8px;
+                display: grid; place-items: center; cursor: pointer;
+            }
+            .resume-cooking-dismiss svg { width: 14px; height: 14px; }
+            @keyframes resumeBannerIn {
+                from { opacity: 0; transform: translateY(8px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        </style>
     </div>
 
     <!-- Modal de Alertas -->

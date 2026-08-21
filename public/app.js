@@ -425,6 +425,10 @@ function abrirModoCocina(tituloReceta, pasosArray) {
     const progresoKey = obtenerClaveProgresoCocina(tituloReceta, pasosLimpios);
     const pasosCompletados = obtenerProgresoCocina(progresoKey);
 
+    // Marcamos esta receta como la "cocina en curso" para poder retomarla
+    // desde el banner flotante si el usuario sale a hacer otra cosa en la app.
+    guardarCocinaActiva(tituloReceta, pasosLimpios);
+
     // Generar las tarjetas de pasos dinámicamente solo con los pasos limpios
     pasosLimpios.forEach((paso, index) => {
         const stepCard = document.createElement('div');
@@ -450,6 +454,69 @@ function abrirModoCocina(tituloReceta, pasosArray) {
     // Mostrar la vista de modo cocina
     vistaCocina.classList.add('active');
     if (window.lucide) lucide.createIcons();
+
+    // Con la vista ya abierta, no hace falta mostrar el banner de "retomar"
+    actualizarBannerRetomarCocina();
+}
+
+const ACTIVE_COOKING_STORAGE_KEY = 'alacena.activeCooking.v1';
+
+// Guarda cuál es la receta que el usuario está cocinando en este momento, para
+// poder ofrecerle volver a ella desde cualquier otra pantalla de la app.
+function guardarCocinaActiva(tituloReceta, pasos) {
+    localStorage.setItem(ACTIVE_COOKING_STORAGE_KEY, JSON.stringify({ title: tituloReceta, pasos }));
+}
+
+function obtenerCocinaActiva() {
+    try {
+        const guardado = JSON.parse(localStorage.getItem(ACTIVE_COOKING_STORAGE_KEY));
+        if (guardado && typeof guardado.title === 'string' && Array.isArray(guardado.pasos)) {
+            return guardado;
+        }
+    } catch (error) {
+        // localStorage corrupto o vacío: lo ignoramos
+    }
+    return null;
+}
+
+function limpiarCocinaActiva() {
+    localStorage.removeItem(ACTIVE_COOKING_STORAGE_KEY);
+}
+
+// Muestra el banner flotante "Cocina en curso" solo cuando hay una receta activa
+// guardada Y el usuario no está ya parado en la vista de Modo Cocina.
+function actualizarBannerRetomarCocina() {
+    const banner = document.getElementById('resume-cooking-banner');
+    if (!banner) return;
+
+    const cocinaActiva = obtenerCocinaActiva();
+    const vistaCocina = document.getElementById('cooking-mode-view');
+    const vistaAbierta = Boolean(vistaCocina && vistaCocina.classList.contains('active'));
+
+    if (!cocinaActiva || vistaAbierta) {
+        banner.classList.add('hidden');
+        return;
+    }
+
+    const tituloEl = document.getElementById('resume-cooking-title');
+    if (tituloEl) tituloEl.textContent = cocinaActiva.title;
+    banner.classList.remove('hidden');
+}
+
+const resumeCookingBtn = document.getElementById('resume-cooking-btn');
+if (resumeCookingBtn) {
+    resumeCookingBtn.addEventListener('click', () => {
+        const cocinaActiva = obtenerCocinaActiva();
+        if (cocinaActiva) abrirModoCocina(cocinaActiva.title, cocinaActiva.pasos);
+    });
+}
+
+const dismissCookingBtn = document.getElementById('dismiss-cooking-btn');
+if (dismissCookingBtn) {
+    dismissCookingBtn.addEventListener('click', () => {
+        limpiarCocinaActiva();
+        actualizarBannerRetomarCocina();
+    });
 }
 
 const COOKING_PROGRESS_STORAGE_PREFIX = 'alacena.cookingProgress.v1.';
