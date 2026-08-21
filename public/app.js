@@ -849,3 +849,24 @@ restaurarTimer();
         }
     });
 })();
+
+// Listener para limpiar la pantalla de recetas manualmente
+document.addEventListener('click', (e) => {
+    const btnLimpiar = e.target.closest('#btn-clear-recipes');
+    if (!btnLimpiar) return;
+
+    const contenedor = document.getElementById('recipes-container') || document.getElementById('view-cook');
+    
+    if (contenedor) {
+        // 1. Vaciar el contenido visual de la pantalla
+        contenedor.innerHTML = '';
+        
+        // 2. Borrar la memoria persistente
+        localStorage.removeItem('alacena.recetasEnPantalla.v1');
+        localStorage.removeItem('alacena.activeCookingSession.v1');
+        
+        // 3. Ocultar el widget de "Continuar cocinando" si estaba activo
+        const btnResume = document.getElementById('btn-resume-cooking');
+        if (btnResume) btnResume.classList.add('hidden');
+    }
+});

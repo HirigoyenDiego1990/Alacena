@@ -54,17 +54,17 @@
             <!-- Sub-vista: Cocinar / Ingredientes -->
             <div id="view-cook" class="sub-view">
     
-    <!-- Widget compacto de recuperación de Modo Cocina -->
-    <div id="btn-resume-cooking" class="resume-widget hidden">
-        <div class="resume-widget-info">
-            <span class="resume-badge">En curso</span>
-            <span id="cooking-resume-title" class="resume-title">Nombre de la receta</span>
-        </div>
-        <span class="resume-action-btn">Continuar ➔</span>
-    </div>
+                <!-- Widget compacto de recuperación de Modo Cocina -->
+                <div id="btn-resume-cooking" class="resume-widget hidden">
+                    <div class="resume-widget-info">
+                        <span class="resume-badge">En curso</span>
+                        <span id="cooking-resume-title" class="resume-title">Nombre de la receta</span>
+                    </div>
+                    <span class="resume-action-btn">Continuar ➔</span>
+                </div>
 
-    <h2 class="section-title">¿Qué hay en tu cocina?</h2>
-    <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
+                <h2 class="section-title">¿Qué hay en tu cocina?</h2>
+                <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
                 <div class="ingredient-input-row">
                     <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz, huevo...">
@@ -77,9 +77,13 @@
                     <span class="empty-hint">Todavía no agregaste ingredientes...</span>
                 </div>
 
-                <div style="margin-bottom: 24px;">
-                    <button type="button" id="generate-btn" class="btn btn-primary">
+                <!-- Grupo de acciones: Generar y Limpiar perfectamente alineados -->
+                <div class="actions-group-row" style="margin-bottom: 24px; display: flex; gap: 10px; align-items: center;">
+                    <button type="button" id="generate-btn" class="btn btn-primary" style="flex: 1;">
                         <span>Generar receta</span>
+                    </button>
+                    <button type="button" id="btn-clear-recipes" class="btn-clear-recipes" title="Limpiar recetas de la pantalla">
+                        🗑️ Limpiar
                     </button>
                 </div>
 

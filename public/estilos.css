@@ -368,6 +368,30 @@ button[type="submit"]:hover {
     margin-left: 12px;
 }
 
+.btn-clear-recipes {
+    background-color: transparent;
+    color: var(--paprika);
+    border: 1px solid var(--paprika);
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px; /* Mismo alto estándar para toque táctil */
+    transition: all 0.2s ease;
+}
+
+.btn-clear-recipes:active {
+    background-color: var(--paprika);
+    color: var(--paper);
+    transform: scale(0.98);
+}
+
 /* ============================================
    SECCIÓN DE INGREDIENTES & INPUT (RENOVADO)
    ============================================ */
