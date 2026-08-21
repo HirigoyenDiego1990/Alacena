@@ -703,3 +703,76 @@ document.addEventListener('visibilitychange', () => {
 
 restaurarTimer();
 
+// =========================================================
+// MÓDULO AISLADO: RECUPERACIÓN DE MODO COCINA (PARA CONCURSO)
+// =========================================================
+(function() {
+    const CLAVE_COCINA = 'alacena.activeCookingSession.v1';
+
+    // 1. Escuchar CUALQUIER clic en botones "Cocinar Paso a Paso" sin modificar tu código previo
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-abrir-cocina');
+        if (!btn) return;
+
+        try {
+            const title = decodeURIComponent(btn.getAttribute('data-title'));
+            const steps = JSON.parse(decodeURIComponent(btn.getAttribute('data-steps')));
+
+            // Guardar respaldo inmediato
+            localStorage.setItem(CLAVE_COCINA, JSON.stringify({ title, steps }));
+            actualizarBotonRecuperar();
+        } catch (err) {
+            console.warn('Error al respaldar receta activa:', err);
+        }
+    });
+
+    // 2. Controlar si el botón verde de recuperar debe verse u ocultarse
+    function actualizarBotonRecuperar() {
+        const btnResume = document.getElementById('btn-resume-cooking');
+        const labelTitle = document.getElementById('cooking-resume-title');
+        const guardado = localStorage.getItem(CLAVE_COCINA);
+
+        if (!btnResume) return;
+
+        if (guardado) {
+            try {
+                const { title } = JSON.parse(guardado);
+                if (labelTitle) labelTitle.textContent = title;
+                btnResume.classList.remove('hidden');
+            } catch (e) {
+                btnResume.classList.add('hidden');
+            }
+        } else {
+            btnResume.classList.add('hidden');
+        }
+    }
+
+    // 3. Reabrir la receta si el usuario presiona el botón verde de recuperar
+    document.addEventListener('click', (e) => {
+        const btnResume = e.target.closest('#btn-resume-cooking');
+        if (!btnResume) return;
+
+        const guardado = localStorage.getItem(CLAVE_COCINA);
+        if (!guardado) return;
+
+        try {
+            const { title, steps } = JSON.parse(guardado);
+            if (typeof window.abrirModoCocina === 'function') {
+                window.abrirModoCocina(title, steps);
+            } else if (typeof abrirModoCocina === 'function') {
+                abrirModoCocina(title, steps);
+            }
+        } catch (err) {
+            console.error('Error al reabrir modo cocina:', err);
+        }
+    });
+
+    // 4. Actualizar visibilidad al cerrar la pantalla de cocina o recargar la app
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#close-cooking-btn')) {
+            setTimeout(actualizarBotonRecuperar, 100);
+        }
+    });
+
+    window.addEventListener('load', actualizarBotonRecuperar);
+})();
