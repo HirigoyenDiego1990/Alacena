@@ -411,16 +411,9 @@ window.marcarCocinada = async function(recipeId, currentCount) {
 
 // Función para abrir el Modo Cocina con los pasos de la receta
 function abrirModoCocina(tituloReceta, pasosArray) {
-    // 1. Guardamos la sesión en localStorage apenas se entra a la receta
-    guardarSesionCocinaActiva(tituloReceta, pasosArray);
-
-    // 2. Obtenemos los elementos de la vista
     const vistaCocina = document.getElementById('cooking-mode-view');
     const tituloEl = document.getElementById('cooking-recipe-title');
     const container = document.getElementById('cooking-steps-container');
-
-    // ... el resto de tu función sigue exactamente igual acá abajo ...
-
     
     tituloEl.textContent = tituloReceta;
     container.innerHTML = '';
@@ -710,72 +703,3 @@ document.addEventListener('visibilitychange', () => {
 
 restaurarTimer();
 
-// ============================================
-// SISTEMA DE RECUPERACIÓN DEL MODO COCINA
-// ============================================
-
-// 1. Guardar la receta activa cuando el usuario entra al Modo Cocina
-// (Llama a esta función o asegúrate de incluir esta línea dentro de tu 'abrirModoCocina')
-function guardarSesionCocinaActiva(tituloReceta, pasosArray) {
-    const datosSesion = {
-        title: tituloReceta,
-        steps: pasosArray
-    };
-    localStorage.setItem(ACTIVE_COOKING_SESSION_KEY, JSON.stringify(datosSesion));
-    verificarBotonRecuperarCocina();
-}
-
-// 2. Controlar la visibilidad del botón de recuperación en la pantalla principal
-function verificarBotonRecuperarCocina() {
-    const btnResume = document.getElementById('btn-resume-cooking');
-    const labelTitle = document.getElementById('cooking-resume-title');
-    const sesionGuardada = localStorage.getItem(ACTIVE_COOKING_SESSION_KEY);
-
-    if (!btnResume) return;
-
-    if (sesionGuardada) {
-        try {
-            const { title } = JSON.parse(sesionGuardada);
-            if (labelTitle) labelTitle.textContent = title;
-            btnResume.classList.remove('hidden'); // Muestra el botón verde
-        } catch (e) {
-            btnResume.classList.add('hidden');
-        }
-    } else {
-        btnResume.classList.add('hidden'); // Oculta el botón si no hay nada pendiente
-    }
-}
-
-// 3. Reabrir la receta guardada cuando el usuario presiona el botón "Volver al Modo Cocina"
-window.recuperarEstadoModoCocina = function() {
-    const sesionGuardada = localStorage.getItem(ACTIVE_COOKING_SESSION_KEY);
-    if (!sesionGuardada) return;
-
-    try {
-        const { title, steps } = JSON.parse(sesionGuardada);
-        if (title && Array.isArray(steps)) {
-            abrirModoCocina(title, steps); // Utiliza tu función existente para renderizar
-        }
-    } catch (e) {
-        console.error("Error al recuperar la receta activa:", e);
-        localStorage.removeItem(ACTIVE_COOKING_SESSION_KEY);
-        verificarBotonRecuperarCocina();
-    }
-};
-
-// ============================================
-// EVENTOS DE ESCUCHA Y INICIALIZACIÓN
-// ============================================
-
-// Asignar el clic al botón flotante de recuperación de la pantalla principal
-document.getElementById('btn-resume-cooking')?.addEventListener('click', window.recuperarEstadoModoCocina);
-
-// Actualizar la visibilidad del botón al cerrar manualmente el Modo Cocina
-document.getElementById('close-cooking-btn')?.addEventListener('click', () => {
-    verificarBotonRecuperarCocina();
-});
-
-// Comprobar si hay una receta pendiente cada vez que se carga la página
-document.addEventListener('DOMContentLoaded', () => {
-    verificarBotonRecuperarCocina();
-});
