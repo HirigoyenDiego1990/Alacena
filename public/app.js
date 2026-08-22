@@ -190,15 +190,10 @@ async function ejecutarGeneracion() {
         return;
     }
 
-    recipesContainer.innerHTML = `
-        <div class="recipe-loading">
-            <div class="recipe-loading-spinner"></div>
-            <p class="recipe-loading-text">Cocinando ideas con IA...</p>
-        </div>
-    `;
+    // 1. Mostrar la animación del cocinerito
+    mostrarCargando();
 
-// Lógica de Generación con Gemini
-try {
+    try {
         // Transformamos los objetos en un array de texto plano con los nombres
         const ingredientesStrings = Array.isArray(userIngredients) 
             ? userIngredients.map(i => i.ingredient) 
@@ -216,8 +211,6 @@ try {
         }
 
         const data = await respuesta.json();
-        // ... el resto de tu código para mostrar las recetas ...
-
         const recipes = data.recipes;
 
         recipesContainer.innerHTML = recipes.map(recipe => {
@@ -228,7 +221,7 @@ try {
                    <span>🛒 Falta comprar:</span> <strong>${recipe.missing_ingredients.join(', ')}</strong>
                    </div>`
                 : `<div class="recipe-badge recipe-badge--success">
-                    ✨ 100% con tu alacena
+                   ✨ 100% con tu alacena
                    </div>`;
 
             const botonWhatsApp = esSugerencia && recipe.missing_ingredients && recipe.missing_ingredients.length > 0
@@ -248,8 +241,7 @@ try {
                    </div>`
                 : '';
 
-            // Convertimos las instrucciones en array (separando por puntos o saltos de línea para el modo cocina)
-            // Si la IA manda un texto largo, esto lo divide en pasos limpios
+            // Convertimos las instrucciones en array
             const pasosArray = parsearPasos(recipe.instructions);
 
             return `
@@ -287,10 +279,22 @@ try {
         console.error("Error capturado:", error);
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
+    } finally {
+        // 2. Ocultar la animación SIEMPRE al terminar (haya o no haya error)
+        ocultarCargando();
     }
-
 }
 
+// Funciones auxiliares para controlar el modal del cocinerito
+function mostrarCargando() {
+    const loader = document.getElementById('loading-modal');
+    if (loader) loader.classList.remove('hidden');
+}
+
+function ocultarCargando() {
+    const loader = document.getElementById('loading-modal');
+    if (loader) loader.classList.add('hidden');
+}
 
 generateBtn.addEventListener('click', ejecutarGeneracion);
 
