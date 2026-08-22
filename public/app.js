@@ -190,10 +190,15 @@ async function ejecutarGeneracion() {
         return;
     }
 
-    // 1. Mostrar la animación del cocinerito
-    mostrarCargando();
+    recipesContainer.innerHTML = `
+        <div class="recipe-loading">
+            <div class="recipe-loading-spinner"></div>
+            <p class="recipe-loading-text">Cocinando ideas con IA...</p>
+        </div>
+    `;
 
-    try {
+// Lógica de Generación con Gemini
+try {
         // Transformamos los objetos en un array de texto plano con los nombres
         const ingredientesStrings = Array.isArray(userIngredients) 
             ? userIngredients.map(i => i.ingredient) 
@@ -211,6 +216,8 @@ async function ejecutarGeneracion() {
         }
 
         const data = await respuesta.json();
+        // ... el resto de tu código para mostrar las recetas ...
+
         const recipes = data.recipes;
 
         recipesContainer.innerHTML = recipes.map(recipe => {
@@ -221,7 +228,7 @@ async function ejecutarGeneracion() {
                    <span>🛒 Falta comprar:</span> <strong>${recipe.missing_ingredients.join(', ')}</strong>
                    </div>`
                 : `<div class="recipe-badge recipe-badge--success">
-                   ✨ 100% con tu alacena
+                    ✨ 100% con tu alacena
                    </div>`;
 
             const botonWhatsApp = esSugerencia && recipe.missing_ingredients && recipe.missing_ingredients.length > 0
@@ -241,7 +248,8 @@ async function ejecutarGeneracion() {
                    </div>`
                 : '';
 
-            // Convertimos las instrucciones en array
+            // Convertimos las instrucciones en array (separando por puntos o saltos de línea para el modo cocina)
+            // Si la IA manda un texto largo, esto lo divide en pasos limpios
             const pasosArray = parsearPasos(recipe.instructions);
 
             return `
@@ -279,22 +287,10 @@ async function ejecutarGeneracion() {
         console.error("Error capturado:", error);
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
-    } finally {
-        // 2. Ocultar la animación SIEMPRE al terminar (haya o no haya error)
-        ocultarCargando();
     }
+
 }
 
-// Funciones auxiliares para controlar el modal del cocinerito
-function mostrarCargando() {
-    const loader = document.getElementById('loading-modal');
-    if (loader) loader.classList.remove('hidden');
-}
-
-function ocultarCargando() {
-    const loader = document.getElementById('loading-modal');
-    if (loader) loader.classList.add('hidden');
-}
 
 generateBtn.addEventListener('click', ejecutarGeneracion);
 
