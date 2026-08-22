@@ -850,23 +850,20 @@ restaurarTimer();
     });
 })();
 
-// Listener para limpiar la pantalla de recetas manualmente
+// Listener para limpiar la pantalla de recetas MANUALMENTE (sin borrar la receta en curso)
 document.addEventListener('click', (e) => {
     const btnLimpiar = e.target.closest('#btn-clear-recipes');
     if (!btnLimpiar) return;
 
-    const contenedor = document.getElementById('recipes-container') || document.getElementById('view-cook');
+    const contenedor = document.getElementById('recipes-container');
     
     if (contenedor) {
-        // 1. Vaciar el contenido visual de la pantalla
+        // 1. Vaciar únicamente el contenedor de recetas visuales
         contenedor.innerHTML = '';
         
-        // 2. Borrar la memoria persistente
+        // 2. Borrar SOLO las recetas de pantalla de la memoria
         localStorage.removeItem('alacena.recetasEnPantalla.v1');
-        localStorage.removeItem('alacena.activeCookingSession.v1');
         
-        // 3. Ocultar el widget de "Continuar cocinando" si estaba activo
-        const btnResume = document.getElementById('btn-resume-cooking');
-        if (btnResume) btnResume.classList.add('hidden');
+        // ¡OJO! No tocamos 'alacena.activeCookingSession.v1' para mantener la receta en curso activa.
     }
 });
