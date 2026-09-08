@@ -5,11 +5,178 @@ const SUPABASE_URL = 'https://mawixmfhfwxsnxsgpgja.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rYDmjondp3uHdqW4lIT9TA_gFXi0yxJ';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Analytics propio y respetuoso de la privacidad.
+// Nunca se envían correos, IDs reales, títulos, instrucciones ni errores completos.
+const ANALYTICS_TABLE = 'analytics_events';
+const ANALYTICS_VERSION = '1.0.0';
+const ANALYTICS_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const ANALYTICS_ANONYMOUS_ID_KEY = 'alacena.analytics.anonymousId.v1';
+const ANALYTICS_SESSION_ID_KEY = 'alacena.analytics.sessionId.v1';
+const ANALYTICS_LAST_ACTIVITY_KEY = 'alacena.analytics.lastActivity.v1';
+
+let analyticsReady = false;
+let analyticsAnonymousId = null;
+let analyticsSessionId = null;
+let analyticsIsNewSession = false;
+let currentPlanState = {
+    plan: 'free',
+    generation_limit: 3,
+    generation_used: 0,
+    generation_remaining: 3,
+    pantry_limit: 20,
+    saved_recipe_limit: 10,
+    alacena_results: 2,
+    suggestion_results: 1
+};
+
+function crearIdAnonimo() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+    }
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+        const random = Math.floor(Math.random() * 16);
+        const value = character === 'x' ? random : (random & 0x3) | 0x8;
+        return value.toString(16);
+    });
+}
+
+function prepararSesionAnalytics() {
+    const ahora = Date.now();
+    const ultimaActividad = Number(localStorage.getItem(ANALYTICS_LAST_ACTIVITY_KEY)) || 0;
+
+    analyticsAnonymousId = localStorage.getItem(ANALYTICS_ANONYMOUS_ID_KEY) || crearIdAnonimo();
+    localStorage.setItem(ANALYTICS_ANONYMOUS_ID_KEY, analyticsAnonymousId);
+
+    analyticsSessionId = localStorage.getItem(ANALYTICS_SESSION_ID_KEY);
+    analyticsIsNewSession = !analyticsSessionId || (ahora - ultimaActividad) > ANALYTICS_SESSION_TIMEOUT_MS;
+
+    if (analyticsIsNewSession) {
+        analyticsSessionId = crearIdAnonimo();
+        localStorage.setItem(ANALYTICS_SESSION_ID_KEY, analyticsSessionId);
+    }
+
+    localStorage.setItem(ANALYTICS_LAST_ACTIVITY_KEY, String(ahora));
+}
+
+function sendAnalyticsEvent(eventName, properties = {}) {
+    // El fallo de Analytics nunca debe afectar la experiencia principal.
+    void supabase.from(ANALYTICS_TABLE).insert([{
+        anonymous_id: analyticsAnonymousId,
+        session_id: analyticsSessionId,
+        event_name: eventName,
+        client_occurred_at: new Date().toISOString(),
+        properties: {
+            ...properties,
+            plan_tier: currentPlanState.plan
+        },
+        app_version: ANALYTICS_VERSION
+    }]).then(() => {}).catch(() => {});
+}
+
+function trackAnalyticsEvent(eventName, properties = {}) {
+    if (!analyticsReady || !analyticsAnonymousId || !analyticsSessionId) return;
+
+    const ahora = Date.now();
+    const ultimaActividad = Number(localStorage.getItem(ANALYTICS_LAST_ACTIVITY_KEY)) || 0;
+    const sessionExpired = ultimaActividad > 0 && (ahora - ultimaActividad) > ANALYTICS_SESSION_TIMEOUT_MS;
+
+    if (sessionExpired) {
+        analyticsSessionId = crearIdAnonimo();
+        localStorage.setItem(ANALYTICS_SESSION_ID_KEY, analyticsSessionId);
+        sendAnalyticsEvent('session_started');
+    }
+
+    localStorage.setItem(ANALYTICS_LAST_ACTIVITY_KEY, String(ahora));
+    sendAnalyticsEvent(eventName, properties);
+}
+
+async function crearHuellaPrivada(value) {
+    const normalizedValue = String(value || '').trim().toLocaleLowerCase('es');
+    if (!normalizedValue || !window.crypto?.subtle) return null;
+
+    try {
+        const bytes = new TextEncoder().encode(normalizedValue);
+        const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(digest)]
+            .map(byte => byte.toString(16).padStart(2, '0'))
+            .join('')
+            .slice(0, 24);
+    } catch (error) {
+        return null;
+    }
+}
+
+async function obtenerMetricasIngredientes(ingredients) {
+    const entries = Array.isArray(ingredients)
+        ? ingredients.map(item => ({
+            name: typeof item === 'string' ? item : (item?.ingredient || item?.name),
+            quantity: typeof item === 'string' ? 1 : (Number(item?.quantity) || 1),
+            unit: typeof item === 'string' ? 'unidad' : (item?.unit || 'unidad')
+        })).filter(item => item.name)
+        : [];
+    const sampledEntries = entries.slice(0, 50);
+    const ingredientIds = await Promise.all(sampledEntries.map(item => crearHuellaPrivada(item.name)));
+    const ingredientInventory = sampledEntries.map((item, index) => ({
+        ingredient_id: ingredientIds[index],
+        quantity: item.quantity,
+        unit: item.unit
+    })).filter(item => item.ingredient_id);
+
+    return {
+        ingredient_count: entries.length,
+        ingredient_ids: ingredientInventory.map(item => item.ingredient_id),
+        ingredient_inventory: ingredientInventory,
+        ingredient_sample_truncated: entries.length > sampledEntries.length
+    };
+}
+
+async function obtenerIdReceta(title) {
+    return crearHuellaPrivada(title);
+}
+
+function trackTechnicalError(context, error, extra = {}) {
+    trackAnalyticsEvent('technical_error', {
+        context,
+        error_type: error?.name || 'UnknownError',
+        ...extra
+    });
+}
+
+function inicializarAnalytics() {
+    prepararSesionAnalytics();
+    analyticsReady = true;
+
+    if (analyticsIsNewSession) {
+        trackAnalyticsEvent('session_started');
+    }
+
+    trackAnalyticsEvent('app_opened', {
+        returning_session: !analyticsIsNewSession
+    });
+    trackAnalyticsEvent('screen_view', { screen: 'cook' });
+}
+
+window.addEventListener('error', event => {
+    const sourceFile = event.filename ? event.filename.split('/').pop() : null;
+    trackTechnicalError('runtime', event.error, {
+        source_file: sourceFile,
+        line: event.lineno || null,
+        column: event.colno || null
+    });
+});
+
+window.addEventListener('unhandledrejection', event => {
+    trackTechnicalError('unhandled_promise', event.reason);
+});
+
 // Elementos del DOM
 const authView = document.getElementById('auth-view');
 const mainView = document.getElementById('main-view');
 const authForm = document.getElementById('auth-form');
 const ingredientInput = document.getElementById('ingredient-input');
+const ingredientQuantityInput = document.getElementById('ingredient-quantity');
+const ingredientUnitInput = document.getElementById('ingredient-unit');
 const addIngredientBtn = document.getElementById('add-ingredient-btn');
 const ingredientsList = document.getElementById('ingredients-list');
 const generateBtn = document.getElementById('generate-btn');
@@ -21,10 +188,12 @@ let userIngredients = [];
 lucide.createIcons();
 
 // Control de Sesión y Redirección de Seguridad
-supabase.auth.getSession().then(({ data: { session } }) => {
+supabase.auth.getSession().then(async ({ data: { session } }) => {
     if (!session) {
         window.location.href = 'login.html';
     } else {
+        await loadPlanState();
+        inicializarAnalytics();
         loadPantry();
     }
 });
@@ -44,6 +213,53 @@ if (logoutBtn) {
 }
 
 // Manejo de Alacena
+function aplicarEstadoPlan(planData) {
+    if (!planData || typeof planData !== 'object') return;
+
+    currentPlanState = {
+        ...currentPlanState,
+        ...planData
+    };
+
+    const isPremium = currentPlanState.plan === 'premium';
+    const badge = document.getElementById('plan-badge');
+    const resultInfo = document.getElementById('generation-result-info');
+    const usageInfo = document.getElementById('generation-usage-info');
+    const premiumFields = document.getElementById('premium-preferences-fields');
+    const premiumMessage = document.getElementById('premium-preferences-message');
+
+    if (badge) {
+        badge.textContent = isPremium ? 'Premium' : 'Free';
+        badge.classList.toggle('plan-badge--free', !isPremium);
+        badge.classList.toggle('plan-badge--premium', isPremium);
+    }
+
+    if (resultInfo) {
+        resultInfo.textContent = `${currentPlanState.alacena_results} recetas + ${currentPlanState.suggestion_results} ${currentPlanState.suggestion_results === 1 ? 'sugerencia' : 'sugerencias'}`;
+    }
+
+    if (usageInfo) {
+        usageInfo.textContent = `${currentPlanState.generation_remaining} de ${currentPlanState.generation_limit} generaciones disponibles hoy`;
+        usageInfo.classList.toggle('limit-reached', currentPlanState.generation_remaining <= 0);
+    }
+
+    if (premiumFields) premiumFields.disabled = !isPremium;
+    if (premiumMessage) premiumMessage.classList.toggle('visible', !isPremium);
+
+}
+
+async function loadPlanState() {
+    const { data, error } = await supabase.rpc('get_my_plan_limits');
+
+    if (error) {
+        trackTechnicalError('plan_load', error);
+        aplicarEstadoPlan(currentPlanState);
+        return;
+    }
+
+    aplicarEstadoPlan(data);
+}
+
 async function loadPantry() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -51,24 +267,66 @@ async function loadPantry() {
     if (data) {
         userIngredients = data;
         renderIngredients();
+        void obtenerMetricasIngredientes(data).then(metrics => {
+            trackAnalyticsEvent('ingredient_inventory_snapshot', metrics);
+        });
+    } else if (error) {
+        trackTechnicalError('pantry_load', error);
     }
 }
 
 addIngredientBtn.addEventListener('click', async () => {
     const val = ingredientInput.value.trim();
+    const quantity = Number(ingredientQuantityInput?.value);
+    const unit = ingredientUnitInput?.value || 'unidad';
     if (!val) return;
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+        showAlert('Cantidad inválida', 'Ingresá una cantidad mayor que cero.', 'warning');
+        return;
+    }
+
+    if (currentPlanState.pantry_limit !== null && userIngredients.length >= currentPlanState.pantry_limit) {
+        showAlert('Límite del plan Free', `Podés guardar hasta ${currentPlanState.pantry_limit} ingredientes.`, 'warning');
+        return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     
-    const { error } = await supabase.from('pantry').insert([{ user_id: user.id, ingredient: val }]);
+    const { error } = await supabase.from('pantry').insert([{
+        user_id: user.id,
+        ingredient: val,
+        quantity,
+        unit
+    }]);
     if (!error) {
         ingredientInput.value = '';
-        loadPantry();
+        if (ingredientQuantityInput) ingredientQuantityInput.value = '1';
+        await loadPantry();
+        const ingredientId = await crearHuellaPrivada(val);
+        trackAnalyticsEvent('ingredient_added', {
+            ingredient_id: ingredientId,
+            ingredient_count: userIngredients.length,
+            quantity,
+            unit
+        });
+    } else {
+        trackTechnicalError('ingredient_add', error);
+        if (error.message?.includes('FREE_PANTRY_LIMIT')) {
+            showAlert('Límite del plan Free', 'Alcanzaste el máximo de 20 ingredientes.', 'warning');
+        }
     }
 });
 
 function renderIngredients() {
+    if (userIngredients.length === 0) {
+        ingredientsList.innerHTML = '<span class="empty-hint">Todavía no agregaste ingredientes...</span>';
+        return;
+    }
+
     ingredientsList.innerHTML = userIngredients.map(item => `
         <span class="ingredient-chip">
+            <strong>${formatearCantidad(item.quantity || 1)} ${item.unit || 'unidad'}</strong>
             ${item.ingredient}
             <button onclick="deleteIngredient('${item.id}')" class="chip-delete-btn">×</button>
         </span>
@@ -76,8 +334,21 @@ function renderIngredients() {
 }
 
 window.deleteIngredient = async function(id) {
-    await supabase.from('pantry').delete().eq('id', id);
-    loadPantry();
+    const removedIngredient = userIngredients.find(item => String(item.id) === String(id));
+    const { error } = await supabase.from('pantry').delete().eq('id', id);
+
+    if (!error) {
+        await loadPantry();
+        const ingredientId = await crearHuellaPrivada(removedIngredient?.ingredient);
+        trackAnalyticsEvent('ingredient_removed', {
+            ingredient_id: ingredientId,
+            ingredient_count: userIngredients.length,
+            quantity: Number(removedIngredient?.quantity) || 1,
+            unit: removedIngredient?.unit || 'unidad'
+        });
+    } else {
+        trackTechnicalError('ingredient_remove', error);
+    }
 }
 
 // Sistema de Alerta Customizada (Modal)
@@ -114,18 +385,44 @@ window.saveRecipe = async function(recipe, event) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    if (currentPlanState.saved_recipe_limit !== null) {
+        const { count, error: countError } = await supabase
+            .from('saved_recipes')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+
+        if (!countError && count >= currentPlanState.saved_recipe_limit) {
+            showAlert('Límite del plan Free', `Podés guardar hasta ${currentPlanState.saved_recipe_limit} recetas.`, 'warning');
+            return;
+        }
+    }
+
     const { data, error } = await supabase.from('saved_recipes').insert([{
         user_id: user.id,
         title: recipe.title,
         time: recipe.time,
         difficulty: String(recipe.difficulty),
         ingredients: Array.isArray(userIngredients) ? userIngredients.map(i => i.ingredient) : [],
-        steps: [recipe.instructions]
+        steps: [recipe.instructions],
+        required_ingredients: Array.isArray(recipe.required_ingredients) ? recipe.required_ingredients : [],
+        missing_ingredients: Array.isArray(recipe.missing_ingredients) ? recipe.missing_ingredients : [],
+        servings: Number(recipe.servings) || 2,
+        duration_minutes: Number(recipe.duration_minutes) || null,
+        recipe_type: recipe.type === 'sugerencia' ? 'sugerencia' : 'alacena',
+        chef_tip: recipe.chef_tip || null,
+        tags: Array.isArray(recipe.tags) ? recipe.tags : []
     }]);
 
     if (error) {
-        showAlert('Error', 'No se pudo guardar: ' + error.message, 'error');
+        trackTechnicalError('recipe_save', error);
+        const message = error.message?.includes('FREE_SAVED_RECIPE_LIMIT')
+            ? 'Alcanzaste el máximo de 10 recetas guardadas del plan Free.'
+            : 'No se pudo guardar la receta.';
+        showAlert('Error', message, 'error');
     } else {
+        trackAnalyticsEvent('recipe_saved', {
+            recipe_id: await obtenerIdReceta(recipe.title)
+        });
         showAlert('¡Guardada!', 'La receta se guardó en tus favoritas con éxito.', 'success');
         // Pequeño pulso visual en el botón de guardar como confirmación extra
         const btn = event && event.currentTarget;
@@ -177,10 +474,36 @@ function parsearPasos(instructions) {
     return texto.split(/\.\s+/).map(p => p.trim()).filter(p => p.length > 0);
 }
 
-// Función global para limpiar/reiniciar las recetas generadas
-window.resetearRecetas = function() {
-    recipesContainer.innerHTML = '';
-    ejecutarGeneracion();
+function formatearCantidad(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '1';
+    return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(number);
+}
+
+function renderIngredientesEstructurados(requiredIngredients) {
+    if (!Array.isArray(requiredIngredients) || requiredIngredients.length === 0) return '';
+
+    return `
+        <div class="recipe-ingredients-box">
+            <strong class="recipe-ingredients-title">Ingredientes para la receta</strong>
+            <ul class="recipe-ingredients-list">
+                ${requiredIngredients.map(item => {
+                    const isMissing = item.availability === 'missing';
+                    return `
+                        <li class="recipe-ingredient ${isMissing ? 'recipe-ingredient--missing' : ''}">
+                            <span>${formatearCantidad(item.quantity)} ${item.unit} · ${item.name}</span>
+                            <span class="recipe-ingredient-status">${isMissing ? 'Comprar' : 'Disponible'}</span>
+                        </li>
+                    `;
+                }).join('')}
+            </ul>
+        </div>
+    `;
+}
+
+function renderRecipeTags(tags) {
+    if (!Array.isArray(tags) || tags.length === 0) return '';
+    return `<div class="recipe-tags">${tags.map(tag => `<span>${tag}</span>`).join('')}</div>`;
 }
 
 async function ejecutarGeneracion() {
@@ -189,30 +512,65 @@ async function ejecutarGeneracion() {
         return;
     }
 
+    if (currentPlanState.generation_remaining <= 0) {
+        await loadPlanState();
+        if (currentPlanState.generation_remaining <= 0) {
+            showAlert('Límite diario alcanzado', `Ya usaste tus ${currentPlanState.generation_limit} generaciones de hoy.`, 'warning');
+            return;
+        }
+    }
+
     // Restablecer estado visual del botón
     generateBtn.innerHTML = '<span>Generar Receta</span>';
+    generateBtn.disabled = true;
 
     // 1. Mostrar la animación del cocinerito
     mostrarCargando();
 
+    const ingredientesDisponibles = Array.isArray(userIngredients)
+        ? userIngredients.map(item => ({
+            name: item.ingredient,
+            quantity: Number(item.quantity) || 1,
+            unit: item.unit || 'unidad'
+        }))
+        : [];
+    const ingredientMetrics = await obtenerMetricasIngredientes(userIngredients);
+    let responseStatus = null;
+
+    trackAnalyticsEvent('recipe_generation_started', ingredientMetrics);
+
     try {
-        const ingredientesStrings = Array.isArray(userIngredients) 
-            ? userIngredients.map(i => i.ingredient) 
-            : [];
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+            throw new Error('Tu sesión venció. Volvé a iniciar sesión.');
+        }
 
         const respuesta = await fetch('/api/generar-receta', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingredientes: ingredientesStrings })
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ ingredientes: ingredientesDisponibles })
         });
+        responseStatus = respuesta.status;
 
         if (!respuesta.ok) {
             const errorData = await respuesta.json().catch(() => ({}));
-            throw new Error(errorData.error || `Error HTTP: ${respuesta.status} - No se pudo generar la receta.`);
+            if (errorData.entitlement) aplicarEstadoPlan(errorData.entitlement);
+            const requestError = new Error(errorData.error || `Error HTTP: ${respuesta.status} - No se pudo generar la receta.`);
+            requestError.code = errorData.code;
+            throw requestError;
         }
 
         const data = await respuesta.json();
-        const recipes = data.recipes;
+        const recipes = Array.isArray(data.recipes) ? data.recipes : [];
+        if (data.entitlement) aplicarEstadoPlan(data.entitlement);
+
+        trackAnalyticsEvent('recipe_generation_succeeded', {
+            ...ingredientMetrics,
+            result_count: recipes.length
+        });
 
         recipesContainer.innerHTML = recipes.map(recipe => {
             const esSugerencia = recipe.type === 'sugerencia' || (recipe.missing_ingredients && recipe.missing_ingredients.length > 0);
@@ -243,6 +601,8 @@ async function ejecutarGeneracion() {
                 : '';
 
             const pasosArray = parsearPasos(recipe.instructions);
+            const requiredIngredientsHTML = renderIngredientesEstructurados(recipe.required_ingredients);
+            const tagsHTML = renderRecipeTags(recipe.tags);
 
             return `
                 <div class="recipe-card-container">
@@ -254,9 +614,12 @@ async function ejecutarGeneracion() {
                     </div>
                     ${badgeHTML}
                     <div class="recipe-meta-row">
-                        <span class="recipe-pill recipe-pill--time">${recipe.time}</span>
+                        <span class="recipe-pill recipe-pill--time">${recipe.duration_minutes ? `${recipe.duration_minutes} min` : recipe.time}</span>
                         <span class="recipe-pill recipe-pill--difficulty">${recipe.difficulty}</span>
+                        <span class="recipe-pill recipe-pill--servings">${recipe.servings || 2} porciones</span>
                     </div>
+                    ${tagsHTML}
+                    ${requiredIngredientsHTML}
                     <p class="recipe-instructions">${recipe.instructions}</p>
 
                     ${chefTipHTML}
@@ -273,15 +636,21 @@ async function ejecutarGeneracion() {
 
         // Cambiamos el texto y asignamos la reconexión limpia
         generateBtn.innerHTML = '<span>🔄 Generar Nuevas Recetas</span>';
-        generateBtn.onclick = window.resetearRecetas;
 
     } catch (error) {
         console.error("Error capturado:", error);
+        trackAnalyticsEvent('recipe_generation_failed', {
+            ...ingredientMetrics,
+            http_status: responseStatus,
+            error_type: error?.code || error?.name || 'GenerationError'
+        });
+        trackTechnicalError('recipe_generation', error, { http_status: responseStatus });
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
     } finally {
         // 2. Ocultar la animación SIEMPRE al terminar
         ocultarCargando();
+        generateBtn.disabled = false;
     }
 }
 
@@ -301,22 +670,110 @@ generateBtn.addEventListener('click', ejecutarGeneracion);
 // Navegación entre vistas
 const viewCook = document.getElementById('view-cook');
 const viewSaved = document.getElementById('view-saved');
+const viewPreferences = document.getElementById('view-preferences');
 const tabSaved = document.getElementById('tab-saved');
 const tabCook = document.querySelector('nav button:first-child');
+const tabPreferences = document.getElementById('tab-preferences');
+
+function mostrarSubVista(view, activeTab, screenName) {
+    [viewCook, viewSaved, viewPreferences].forEach(item => item?.classList.add('hidden'));
+    [tabCook, tabSaved, tabPreferences].forEach(item => item?.classList.remove('active'));
+
+    view?.classList.remove('hidden');
+    activeTab?.classList.add('active');
+    trackAnalyticsEvent('screen_view', { screen: screenName });
+}
 
 tabSaved.addEventListener('click', () => {
-    viewCook.classList.add('hidden');
-    viewSaved.classList.remove('hidden');
-    tabSaved.classList.replace('text-slate-400', 'text-orange-500');
-    tabCook.classList.replace('text-orange-500', 'text-slate-400');
+    mostrarSubVista(viewSaved, tabSaved, 'saved_recipes');
     loadSavedRecipes();
 });
 
 tabCook.addEventListener('click', () => {
-    viewSaved.classList.add('hidden');
-    viewCook.classList.remove('hidden');
-    tabCook.classList.replace('text-slate-400', 'text-orange-500');
-    tabSaved.classList.replace('text-orange-500', 'text-slate-400');
+    mostrarSubVista(viewCook, tabCook, 'cook');
+});
+
+tabPreferences.addEventListener('click', () => {
+    mostrarSubVista(viewPreferences, tabPreferences, 'preferences');
+    loadPreferences();
+});
+
+function normalizarListaPreferencias(value) {
+    return [...new Set(String(value || '')
+        .split(/[,\n]+/)
+        .map(item => item.trim().slice(0, 80))
+        .filter(Boolean))]
+        .slice(0, 30);
+}
+
+async function loadPreferences() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+        .from('user_recipe_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (error) {
+        trackTechnicalError('preferences_load', error);
+        showAlert('Error', 'No se pudieron cargar tus preferencias.', 'error');
+        return;
+    }
+
+    const preferences = data || {};
+    document.getElementById('preference-diet').value = preferences.diet_type || 'sin_preferencia';
+    document.getElementById('preference-avoid').value = Array.isArray(preferences.avoid_ingredients)
+        ? preferences.avoid_ingredients.join(', ')
+        : '';
+    document.getElementById('preference-servings').value = preferences.default_servings || 2;
+    document.getElementById('preference-max-time').value = preferences.max_time_minutes || '';
+    document.getElementById('preference-goal').value = preferences.cooking_goal || '';
+
+    const selectedEquipment = new Set(Array.isArray(preferences.equipment) ? preferences.equipment : []);
+    document.querySelectorAll('input[name="preference-equipment"]').forEach(input => {
+        input.checked = selectedEquipment.has(input.value);
+    });
+}
+
+document.getElementById('preferences-form').addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const payload = {
+        user_id: user.id,
+        diet_type: document.getElementById('preference-diet').value,
+        avoid_ingredients: normalizarListaPreferencias(document.getElementById('preference-avoid').value),
+        updated_at: new Date().toISOString()
+    };
+
+    if (currentPlanState.plan === 'premium') {
+        payload.default_servings = Number(document.getElementById('preference-servings').value) || 2;
+        payload.max_time_minutes = Number(document.getElementById('preference-max-time').value) || null;
+        payload.cooking_goal = document.getElementById('preference-goal').value || null;
+        payload.equipment = [...document.querySelectorAll('input[name="preference-equipment"]:checked')]
+            .map(input => input.value);
+    }
+
+    const saveButton = document.getElementById('save-preferences-btn');
+    saveButton.disabled = true;
+
+    const { error } = await supabase
+        .from('user_recipe_preferences')
+        .upsert(payload, { onConflict: 'user_id' });
+
+    saveButton.disabled = false;
+
+    if (error) {
+        trackTechnicalError('preferences_save', error);
+        showAlert('Error', 'No se pudieron guardar tus preferencias.', 'error');
+        return;
+    }
+
+    showAlert('Preferencias guardadas', 'Las próximas recetas respetarán tu configuración.', 'success');
 });
 
 async function loadSavedRecipes() {
@@ -325,30 +782,41 @@ async function loadSavedRecipes() {
     
     const { data, error } = await supabase.from('saved_recipes').select('*').eq('user_id', user.id);
     const container = document.getElementById('saved-recipes-list');
+
+    if (error) {
+        trackTechnicalError('saved_recipes_load', error);
+    }
     
     if (data && data.length > 0) {
-        container.innerHTML = data.map(recipe => `
-            <div class="recipe-card-container">
-                <button onclick="deleteRecipe('${recipe.id}', event)" class="recipe-action-btn btn-delete" title="Eliminar receta">
-                    <i data-lucide="trash-2"></i>
-                </button>
-                <div>
-                    <h3 class="recipe-card-title">${recipe.title}</h3>
+        container.innerHTML = data.map(recipe => {
+            const structuredIngredients = renderIngredientesEstructurados(recipe.required_ingredients);
+            const tagsHTML = renderRecipeTags(recipe.tags);
+
+            return `
+                <div class="recipe-card-container">
+                    <button onclick="deleteRecipe('${recipe.id}', event)" class="recipe-action-btn btn-delete" title="Eliminar receta">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                    <div>
+                        <h3 class="recipe-card-title">${recipe.title}</h3>
+                    </div>
+                    <div class="saved-recipe-meta">
+                        <span>${recipe.duration_minutes ? `${recipe.duration_minutes} min` : recipe.time} · ${recipe.difficulty} · ${recipe.servings || 2} porciones</span>
+                        <span class="cooked-badge">
+                            🍳 Cocinada: <strong>${recipe.times_cooked || 0}</strong> veces
+                        </span>
+                    </div>
+                    ${tagsHTML}
+                    ${structuredIngredients}
+                    <p class="recipe-instructions recipe-instructions--italic">
+                        ${recipe.steps ? recipe.steps.join(' ') : 'Sin pasos guardados'}
+                    </p>
+                    <button onclick="marcarCocinada('${recipe.id}', ${recipe.times_cooked || 0})" class="btn-cook-today">
+                        ✨ ¡Cocinada hoy! (Sumar al historial)
+                    </button>
                 </div>
-                <div class="saved-recipe-meta">
-                    <span>Tiempo: ${recipe.time} | Dificultad: ${recipe.difficulty}</span>
-                    <span class="cooked-badge">
-                        🍳 Cocinada: <strong>${recipe.times_cooked || 0}</strong> veces
-                    </span>
-                </div>
-                <p class="recipe-instructions recipe-instructions--italic">
-                    ${recipe.steps ? recipe.steps.join(' ') : 'Sin pasos guardados'}
-                </p>
-                <button onclick="marcarCocinada('${recipe.id}', ${recipe.times_cooked || 0})" class="btn-cook-today">
-                    ✨ ¡Cocinada hoy! (Sumar al historial)
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         lucide.createIcons();
     } else {
         container.innerHTML = '<p class="empty-state">Aún no guardaste ninguna receta.</p>';
@@ -364,8 +832,10 @@ window.deleteRecipe = async function(id, event) {
     const { error } = await supabase.from('saved_recipes').delete().eq('id', id);
 
     if (error) {
+        trackTechnicalError('recipe_delete', error);
         showAlert('Error al borrar', 'No se pudo eliminar: ' + error.message, 'error');
     } else {
+        trackAnalyticsEvent('recipe_deleted');
         showAlert('Eliminada', 'La receta fue removida de tus favoritas.', 'info');
         loadSavedRecipes();
     }
@@ -383,38 +853,27 @@ window.enviarPorWhatsApp = function(recipeTitle, missingArray) {
     window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
 }
 
-window.modoEmergencia = function() {
-    const inputField = document.getElementById('ingredient-input');
-    if (!inputField) return;
-
-    const bancoRandom = [
-        "huevo", "arroz", "fideos", "lata de atún", "medio tomate", 
-        "queso rallado", "pan lactal viejo", "cebolla", "pimiento triste", 
-        "lata de arvejas", "morrón", "paté", "caldo en cubo", "limón", "polenta"
-    ];
-
-    const cantidadAElegir = Math.floor(Math.random() * 3) + 3;
-    const elegidos = bancoRandom.sort(() => 0.5 - Math.random()).slice(0, cantidadAElegir);
-
-    inputField.value = elegidos.join(', ');
-    showAlert('🚨 Ruleta de Supervivencia', `Heladera en cero. El azar dictaminó: [${inputField.value}]. ¡A cocinar!`, 'info');
-    ejecutarGeneracion();
-}
-
 window.marcarCocinada = async function(recipeId, currentCount) {
     const nuevoTotal = (currentCount || 0) + 1;
     const { error } = await supabase.from('saved_recipes').update({ times_cooked: nuevoTotal }).eq('id', recipeId);
 
     if (error) {
+        trackTechnicalError('recipe_mark_cooked', error);
         showAlert('Error', 'No se pudo registrar la cocinada.', 'error');
     } else {
+        trackAnalyticsEvent('recipe_marked_cooked', {
+            recipe_id: await crearHuellaPrivada(recipeId),
+            cooked_count: nuevoTotal
+        });
         showAlert('🍳 ¡Buen provecho!', `Esta receta ya te salvó ${nuevoTotal} veces.`, 'info');
         setTimeout(() => loadSavedRecipes(), 800);
     }
 }
 
+let currentCookingAnalytics = null;
+
 // Función para abrir el Modo Cocina con los pasos de la receta
-function abrirModoCocina(tituloReceta, pasosArray) {
+async function abrirModoCocina(tituloReceta, pasosArray, source = 'recipe_card') {
     const vistaCocina = document.getElementById('cooking-mode-view');
     const tituloEl = document.getElementById('cooking-recipe-title');
     const container = document.getElementById('cooking-steps-container');
@@ -428,6 +887,22 @@ function abrirModoCocina(tituloReceta, pasosArray) {
         : [];
     const progresoKey = obtenerClaveProgresoCocina(tituloReceta, pasosLimpios);
     const pasosCompletados = obtenerProgresoCocina(progresoKey);
+    currentCookingAnalytics = {
+        recipe_id: await obtenerIdReceta(tituloReceta),
+        finished_tracked: pasosLimpios.length > 0 && pasosLimpios.every((_, index) => Boolean(pasosCompletados[index]))
+    };
+
+    trackAnalyticsEvent('recipe_opened', {
+        recipe_id: currentCookingAnalytics.recipe_id,
+        source
+    });
+    trackAnalyticsEvent('cooking_started', {
+        recipe_id: currentCookingAnalytics.recipe_id,
+        source,
+        step_count: pasosLimpios.length,
+        completed_step_count: pasosCompletados.filter(Boolean).length
+    });
+    trackAnalyticsEvent('screen_view', { screen: 'cooking_mode' });
 
     // Generar las tarjetas de pasos dinámicamente solo con los pasos limpios
     pasosLimpios.forEach((paso, index) => {
@@ -444,6 +919,26 @@ function abrirModoCocina(tituloReceta, pasosArray) {
             stepCard.classList.toggle('completed');
             guardarProgresoCocina(progresoKey, container);
             actualizarProgresoCocina();
+
+            const completedCards = container.querySelectorAll('.cooking-step-card.completed').length;
+            const totalCards = container.querySelectorAll('.cooking-step-card').length;
+
+            if (stepCard.classList.contains('completed')) {
+                trackAnalyticsEvent('cooking_step_completed', {
+                    recipe_id: currentCookingAnalytics?.recipe_id || null,
+                    step_number: index + 1,
+                    completed_step_count: completedCards,
+                    step_count: totalCards
+                });
+            }
+
+            if (totalCards > 0 && completedCards === totalCards && !currentCookingAnalytics?.finished_tracked) {
+                if (currentCookingAnalytics) currentCookingAnalytics.finished_tracked = true;
+                trackAnalyticsEvent('cooking_finished', {
+                    recipe_id: currentCookingAnalytics?.recipe_id || null,
+                    step_count: totalCards
+                });
+            }
         });
 
         container.appendChild(stepCard);
@@ -499,6 +994,7 @@ function actualizarProgresoCocina() {
 // Botón para cerrar el modo cocina
 document.getElementById('close-cooking-btn').addEventListener('click', () => {
     document.getElementById('cooking-mode-view').classList.remove('active');
+    trackAnalyticsEvent('screen_view', { screen: 'cook' });
 });
 
 // Escucha global para abrir el modo cocina de forma segura
@@ -509,7 +1005,7 @@ document.addEventListener('click', (e) => {
     const titulo = decodeURIComponent(btn.getAttribute('data-title'));
     const pasos = JSON.parse(decodeURIComponent(btn.getAttribute('data-steps')));
     
-    abrirModoCocina(titulo, pasos);
+    abrirModoCocina(titulo, pasos, 'recipe_card');
 });
 
 let timerInterval = null;
@@ -559,6 +1055,7 @@ function finalizarTimer() {
     guardarTimer();
     actualizarDisplayTimer();
     actualizarBotonTimer();
+    trackAnalyticsEvent('timer_finished');
 
     // Efecto visual y vibración inicial
     if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 300]);
@@ -643,6 +1140,9 @@ function toggleTimer() {
         guardarTimer();
         actualizarDisplayTimer();
         actualizarBotonTimer();
+        trackAnalyticsEvent('timer_paused', {
+            remaining_seconds: timeLeftSeconds
+        });
     } else {
         if (timeLeftSeconds <= 0) return;
         
@@ -650,6 +1150,10 @@ function toggleTimer() {
         timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
         guardarTimer();
         actualizarBotonTimer();
+        trackAnalyticsEvent('timer_started', {
+            configured_minutes: Math.ceil(timeLeftSeconds / 60),
+            remaining_seconds: timeLeftSeconds
+        });
 
         const cajaTimer = document.querySelector('.cooking-timer-box');
         if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
@@ -668,6 +1172,10 @@ document.addEventListener('click', (e) => {
         if (isTimerRunning) timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
         guardarTimer();
         actualizarDisplayTimer();
+        trackAnalyticsEvent('timer_configured', {
+            minutes_added: minutesToAdd,
+            configured_minutes: Math.ceil(timeLeftSeconds / 60)
+        });
     }
     
     // Botón Iniciar / Pausar
@@ -678,6 +1186,8 @@ document.addEventListener('click', (e) => {
     // Botón Reset
     // Botón Reset (asegúrate de agregar esta línea en tu manejador de reset existente)
 if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
+    const previousSeconds = timeLeftSeconds;
+    const wasRunning = isTimerRunning;
     clearInterval(timerInterval);
     clearInterval(alarmaInterval); // <--- Esto detiene el sonido sin parar
     isTimerRunning = false;
@@ -685,6 +1195,10 @@ if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
     timerEndTimestamp = null;
     guardarTimer();
     actualizarDisplayTimer();
+        trackAnalyticsEvent('timer_reset', {
+            previous_seconds: previousSeconds,
+            was_running: wasRunning
+        });
         const toggleBtn = document.getElementById('timer-toggle-btn');
         if (toggleBtn) {
             toggleBtn.textContent = 'Iniciar';
@@ -800,9 +1314,9 @@ restaurarTimer();
         try {
             const { title, steps } = JSON.parse(guardado);
             if (typeof window.abrirModoCocina === 'function') {
-                window.abrirModoCocina(title, steps);
+                window.abrirModoCocina(title, steps, 'resume_widget');
             } else if (typeof abrirModoCocina === 'function') {
-                abrirModoCocina(title, steps);
+                abrirModoCocina(title, steps, 'resume_widget');
             }
             actualizarBotonRecuperar();
         } catch (err) {
@@ -854,19 +1368,25 @@ restaurarTimer();
     });
 })();
 
-// Listener para limpiar la pantalla de recetas MANUALMENTE (sin borrar la receta en curso)
+// Listener para borrar las recetas de la pantalla (sin borrar la receta en curso)
 document.addEventListener('click', (e) => {
-    const btnLimpiar = e.target.closest('#btn-clear-recipes');
-    if (!btnLimpiar) return;
+    const btnBorrar = e.target.closest('#btn-delete-recipes');
+    if (!btnBorrar) return;
 
     const contenedor = document.getElementById('recipes-container');
     
     if (contenedor) {
+        const deletedRecipeCount = contenedor.querySelectorAll('.recipe-card-container').length;
+
         // 1. Vaciar únicamente el contenedor de recetas visuales
         contenedor.innerHTML = '';
         
         // 2. Borrar SOLO las recetas de pantalla de la memoria
         localStorage.removeItem('alacena.recetasEnPantalla.v1');
+
+        trackAnalyticsEvent('recipes_cleared', {
+            recipe_count: deletedRecipeCount
+        });
         
         // ¡OJO! No tocamos 'alacena.activeCookingSession.v1' para mantener la receta en curso activa.
     }

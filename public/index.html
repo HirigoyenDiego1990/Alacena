@@ -35,7 +35,10 @@
                 </div>
                 <div class="brand-text-group">
                     <h1 class="brand-title">Alacena</h1>
-                    <span class="brand-subtitle">Zafa con lo que hay</span>
+                    <div class="brand-meta-row">
+                        <span class="brand-subtitle">Zafa con lo que hay</span>
+                        <span id="plan-badge" class="plan-badge plan-badge--free">Free</span>
+                    </div>
                 </div>
             </div>
             
@@ -67,7 +70,18 @@
                 <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
                 <div class="ingredient-input-row">
-                    <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz, huevo...">
+                    <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz…" aria-label="Ingrediente">
+                    <input type="number" id="ingredient-quantity" class="ingredient-quantity" value="1" min="0.01" max="99999" step="0.01" inputmode="decimal" aria-label="Cantidad">
+                    <select id="ingredient-unit" class="ingredient-unit" aria-label="Unidad">
+                        <option value="unidad">unidad</option>
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="l">l</option>
+                        <option value="taza">taza</option>
+                        <option value="cda">cda</option>
+                        <option value="cdita">cdita</option>
+                    </select>
                     <button type="button" id="add-ingredient-btn" class="add-btn" aria-label="Agregar ingrediente">
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
@@ -77,14 +91,16 @@
                     <span class="empty-hint">Todavía no agregaste ingredientes...</span>
                 </div>
 
-                <!-- Grupo de acciones: Generar y Limpiar perfectamente alineados -->
-                <div class="actions-group-row" style="margin-bottom: 24px; display: flex; gap: 10px; align-items: center;">
-                    <button type="button" id="generate-btn" class="btn btn-primary" style="flex: 1;">
-                        <span>Generar receta</span>
-                    </button>
-                    <button type="button" id="btn-clear-recipes" class="btn-clear-recipes" title="Limpiar recetas de la pantalla">
-                        🗑️ Limpiar
-                    </button>
+                <div class="actions-group-row" style="margin-bottom: 24px; display: flex; align-items: center;">
+                    <div class="generation-action-box">
+                        <div class="generation-plan-info">
+                            <span id="generation-result-info">2 recetas + 1 sugerencia</span>
+                            <span id="generation-usage-info">Cargando límite diario…</span>
+                        </div>
+                        <button type="button" id="generate-btn" class="btn btn-primary">
+                            <span>Generar receta</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="recipes-container" class="recipe-list"></div>
@@ -95,6 +111,94 @@
                 <h2 class="section-title">Mis Favoritas</h2>
                 <p class="section-sub">Tus recetas guardadas para cocinar cuando quieras.</p>
                 <div id="saved-recipes-list" class="recipe-list"></div>
+            </div>
+
+            <!-- Sub-vista: Preferencias culinarias -->
+            <div id="view-preferences" class="sub-view hidden">
+                <h2 class="section-title">Preferencias</h2>
+                <p class="section-sub">Personalizá las recetas sin compartir estas preferencias con Analytics.</p>
+
+                <form id="preferences-form" class="preferences-form">
+                    <div class="preference-section">
+                        <div class="preference-section-heading">
+                            <h3>Alimentación y exclusiones</h3>
+                            <span class="preference-access-badge">Todos los planes</span>
+                        </div>
+
+                        <label class="preference-field">
+                            <span>Tipo de alimentación</span>
+                            <select id="preference-diet">
+                                <option value="sin_preferencia">Sin preferencia</option>
+                                <option value="omnivora">Omnívora</option>
+                                <option value="vegetariana">Vegetariana</option>
+                                <option value="vegana">Vegana</option>
+                                <option value="sin_gluten">Sin gluten</option>
+                                <option value="sin_lactosa">Sin lactosa</option>
+                            </select>
+                        </label>
+
+                        <label class="preference-field">
+                            <span>Ingredientes que no deben aparecer</span>
+                            <textarea id="preference-avoid" rows="3" placeholder="Ej. maní, mariscos, cebolla…"></textarea>
+                            <small>Separalos con comas. Esta opción también sirve para alergias o intolerancias.</small>
+                        </label>
+                    </div>
+
+                    <div class="preference-section preference-section--premium">
+                        <div class="preference-section-heading">
+                            <h3>Personalización avanzada</h3>
+                            <span class="preference-premium-badge">Premium</span>
+                        </div>
+                        <p id="premium-preferences-message" class="premium-preferences-message">Disponible con el plan Premium.</p>
+
+                        <fieldset id="premium-preferences-fields" class="premium-preferences-fields" disabled>
+                            <div class="preference-grid">
+                                <label class="preference-field">
+                                    <span>Porciones habituales</span>
+                                    <input type="number" id="preference-servings" value="2" min="1" max="20">
+                                </label>
+
+                                <label class="preference-field">
+                                    <span>Tiempo máximo</span>
+                                    <select id="preference-max-time">
+                                        <option value="">Sin límite</option>
+                                        <option value="15">15 minutos</option>
+                                        <option value="30">30 minutos</option>
+                                        <option value="45">45 minutos</option>
+                                        <option value="60">60 minutos</option>
+                                        <option value="90">90 minutos</option>
+                                    </select>
+                                </label>
+                            </div>
+
+                            <label class="preference-field">
+                                <span>Objetivo principal</span>
+                                <select id="preference-goal">
+                                    <option value="">Sin prioridad</option>
+                                    <option value="economia">Ahorrar dinero</option>
+                                    <option value="rapidez">Cocinar rápido</option>
+                                    <option value="aprovechamiento">Evitar desperdicios</option>
+                                    <option value="equilibrio">Comer equilibrado</option>
+                                </select>
+                            </label>
+
+                            <div class="preference-field">
+                                <span>Equipamiento disponible</span>
+                                <div class="equipment-options">
+                                    <label><input type="checkbox" name="preference-equipment" value="horno"> Horno</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="microondas"> Microondas</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="air_fryer"> Air fryer</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="licuadora"> Licuadora</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="olla_presion"> Olla a presión</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="parrilla"> Parrilla</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+
+                    <p class="preference-safety-note">Si tenés una alergia grave, verificá siempre los ingredientes antes de cocinar. Alacena no reemplaza asesoramiento médico.</p>
+                    <button type="submit" id="save-preferences-btn" class="btn btn-primary">Guardar preferencias</button>
+                </form>
             </div>
 
             <!-- VISTA: MODO COCINA PASO A PASO -->
@@ -148,14 +252,19 @@
                 <span>Cocinar</span>
             </button>
             
-            <button type="button" onclick="modoEmergencia()" class="nav-btn nav-btn-emergency" title="Modo Emergencia: Heladera Vacía">
-                <span class="emergency-icon">🚨</span>
-                <span>Heladera Vacía</span>
+            <button type="button" id="btn-delete-recipes" class="nav-btn nav-btn-delete-recipes" title="Borrar recetas de la pantalla">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                <span>Borrar recetas</span>
             </button>
-            
+
             <button type="button" id="tab-saved" class="nav-btn" data-target="saved">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
                 <span>Guardadas</span>
+            </button>
+
+            <button type="button" id="tab-preferences" class="nav-btn" data-target="preferences">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"></path><path d="M4 10V3"></path><path d="M12 21v-9"></path><path d="M12 8V3"></path><path d="M20 21v-5"></path><path d="M20 12V3"></path><path d="M1 14h6"></path><path d="M9 8h6"></path><path d="M17 16h6"></path></svg>
+                <span>Preferencias</span>
             </button>
         </nav>
     </div>
