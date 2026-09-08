@@ -180,8 +180,7 @@ function parsearPasos(instructions) {
 // Función global para limpiar/reiniciar las recetas generadas
 window.resetearRecetas = function() {
     recipesContainer.innerHTML = '';
-    generateBtn.innerHTML = '<span>Generar Recetas Mágicas</span>';
-    generateBtn.onclick = ejecutarGeneracion;
+    ejecutarGeneracion();
 }
 
 async function ejecutarGeneracion() {
@@ -190,11 +189,13 @@ async function ejecutarGeneracion() {
         return;
     }
 
+    // Restablecer estado visual del botón
+    generateBtn.innerHTML = '<span>Generar Receta</span>';
+
     // 1. Mostrar la animación del cocinerito
     mostrarCargando();
 
     try {
-        // Transformamos los objetos en un array de texto plano con los nombres
         const ingredientesStrings = Array.isArray(userIngredients) 
             ? userIngredients.map(i => i.ingredient) 
             : [];
@@ -202,7 +203,7 @@ async function ejecutarGeneracion() {
         const respuesta = await fetch('/api/generar-receta', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ingredientes: ingredientesStrings }) // <--- Enviamos el array de strings limpio
+            body: JSON.stringify({ ingredientes: ingredientesStrings })
         });
 
         if (!respuesta.ok) {
@@ -241,7 +242,6 @@ async function ejecutarGeneracion() {
                    </div>`
                 : '';
 
-            // Convertimos las instrucciones en array
             const pasosArray = parsearPasos(recipe.instructions);
 
             return `
@@ -260,7 +260,6 @@ async function ejecutarGeneracion() {
                     <p class="recipe-instructions">${recipe.instructions}</p>
 
                     ${chefTipHTML}
-                    <!-- Botón para disparar el Modo Cocina -->
                     <button type="button" class="btn-cook-today btn-abrir-cocina" data-title="${encodeURIComponent(recipe.title)}" data-steps="${encodeURIComponent(JSON.stringify(pasosArray))}">
                     <i data-lucide="chef-hat"></i>
                     <span>👨‍🍳 Cocinar Paso a Paso</span>
@@ -272,15 +271,16 @@ async function ejecutarGeneracion() {
 
         lucide.createIcons();
 
+        // Cambiamos el texto y asignamos la reconexión limpia
         generateBtn.innerHTML = '<span>🔄 Generar Nuevas Recetas</span>';
-        generateBtn.onclick = resetearRecetas;
+        generateBtn.onclick = window.resetearRecetas;
 
     } catch (error) {
         console.error("Error capturado:", error);
         showAlert('Error', error.message, 'error');
         recipesContainer.innerHTML = '';
     } finally {
-        // 2. Ocultar la animación SIEMPRE al terminar (haya o no haya error)
+        // 2. Ocultar la animación SIEMPRE al terminar
         ocultarCargando();
     }
 }
