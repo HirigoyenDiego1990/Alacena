@@ -227,6 +227,8 @@ function aplicarEstadoPlan(planData) {
     const usageInfo = document.getElementById('generation-usage-info');
     const premiumFields = document.getElementById('premium-preferences-fields');
     const premiumMessage = document.getElementById('premium-preferences-message');
+    const weeklyPlanLocked = document.getElementById('weekly-plan-locked');
+    const weeklyPlanContent = document.getElementById('weekly-plan-content');
 
     if (badge) {
         badge.textContent = isPremium ? 'Premium' : 'Free';
@@ -245,6 +247,8 @@ function aplicarEstadoPlan(planData) {
 
     if (premiumFields) premiumFields.disabled = !isPremium;
     if (premiumMessage) premiumMessage.classList.toggle('visible', !isPremium);
+    if (weeklyPlanLocked) weeklyPlanLocked.classList.toggle('hidden', isPremium);
+    if (weeklyPlanContent) weeklyPlanContent.classList.toggle('hidden', !isPremium);
 
 }
 
@@ -671,13 +675,16 @@ generateBtn.addEventListener('click', ejecutarGeneracion);
 const viewCook = document.getElementById('view-cook');
 const viewSaved = document.getElementById('view-saved');
 const viewPreferences = document.getElementById('view-preferences');
+const viewWeeklyPlan = document.getElementById('view-weekly-plan');
+const viewShoppingList = document.getElementById('view-shopping-list');
 const tabSaved = document.getElementById('tab-saved');
 const tabCook = document.querySelector('nav button:first-child');
 const tabPreferences = document.getElementById('tab-preferences');
+const tabWeeklyPlan = document.getElementById('tab-weekly-plan');
 
 function mostrarSubVista(view, activeTab, screenName) {
-    [viewCook, viewSaved, viewPreferences].forEach(item => item?.classList.add('hidden'));
-    [tabCook, tabSaved, tabPreferences].forEach(item => item?.classList.remove('active'));
+    [viewCook, viewSaved, viewPreferences, viewWeeklyPlan, viewShoppingList].forEach(item => item?.classList.add('hidden'));
+    [tabCook, tabSaved, tabPreferences, tabWeeklyPlan].forEach(item => item?.classList.remove('active'));
 
     view?.classList.remove('hidden');
     activeTab?.classList.add('active');
@@ -696,6 +703,11 @@ tabCook.addEventListener('click', () => {
 tabPreferences.addEventListener('click', () => {
     mostrarSubVista(viewPreferences, tabPreferences, 'preferences');
     loadPreferences();
+});
+
+tabWeeklyPlan.addEventListener('click', () => {
+    mostrarSubVista(viewWeeklyPlan, tabWeeklyPlan, 'weekly_plan');
+    if (currentPlanState.plan === 'premium') loadWeeklyPlan();
 });
 
 function normalizarListaPreferencias(value) {
@@ -774,6 +786,769 @@ document.getElementById('preferences-form').addEventListener('submit', async eve
     }
 
     showAlert('Preferencias guardadas', 'Las próximas recetas respetarán tu configuración.', 'success');
+});
+
+const WEEKLY_MEAL_TYPES = [
+    { key: 'lunch', label: 'Almuerzo' },
+    { key: 'dinner', label: 'Cena' }
+];
+
+const weeklyPlanState = {
+    weekStart: obtenerInicioSemana(new Date()),
+    planId: null,
+    userId: null,
+    recipes: [],
+    meals: new Map(),
+    defaultServings: 2,
+    movingKey: null,
+    loadVersion: 0
+};
+
+function obtenerInicioSemana(date) {
+    const result = new Date(date);
+    result.setHours(12, 0, 0, 0);
+    const day = result.getDay();
+    result.setDate(result.getDate() - (day === 0 ? 6 : day - 1));
+    return result;
+}
+
+function sumarDias(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+function fechaLocalISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function escaparHTML(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function crearMealKey(date, mealType) {
+    return `${date}|${mealType}`;
+}
+
+function separarMealKey(key) {
+    const [mealDate, mealType] = key.split('|');
+    return { mealDate, mealType };
+}
+
+function obtenerSlotsSemana() {
+    const slots = [];
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const date = fechaLocalISO(sumarDias(weeklyPlanState.weekStart, dayIndex));
+        WEEKLY_MEAL_TYPES.forEach(type => slots.push({ date, mealType: type.key }));
+    }
+    return slots;
+}
+
+function crearRecipeSnapshot(recipe) {
+    return {
+        title: recipe.title,
+        time: recipe.time,
+        duration_minutes: recipe.duration_minutes,
+        difficulty: recipe.difficulty,
+        servings: recipe.servings || 2,
+        required_ingredients: Array.isArray(recipe.required_ingredients) ? recipe.required_ingredients : [],
+        missing_ingredients: Array.isArray(recipe.missing_ingredients) ? recipe.missing_ingredients : [],
+        recipe_type: recipe.recipe_type || 'alacena',
+        tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+        steps: Array.isArray(recipe.steps) ? recipe.steps : []
+    };
+}
+
+function renderWeeklyMealSlot(date, mealType, label) {
+    const key = crearMealKey(date, mealType);
+    const meal = weeklyPlanState.meals.get(key);
+    const recipeId = meal?.saved_recipe_id || '';
+    const options = weeklyPlanState.recipes.map(recipe => `
+        <option value="${escaparHTML(recipe.id)}" ${String(recipe.id) === String(recipeId) ? 'selected' : ''}>
+            ${escaparHTML(recipe.title)}
+        </option>
+    `).join('');
+    const isLocked = Boolean(meal?.is_locked);
+    const isCooked = Boolean(meal?.is_cooked);
+    const isMoving = weeklyPlanState.movingKey === key;
+
+    return `
+        <div class="meal-slot ${isLocked ? 'is-locked' : ''} ${isCooked ? 'is-cooked' : ''} ${isMoving ? 'is-moving' : ''}" data-meal-key="${key}">
+            <div class="meal-slot-title">
+                <span>${label}</span>
+                <span>${isCooked ? '✓ Cocinada' : (isLocked ? '🔒 Fija' : '')}</span>
+            </div>
+            <select class="meal-recipe-select" ${isLocked ? 'disabled' : ''} aria-label="Receta para ${label}">
+                <option value="">Sin asignar</option>
+                ${options}
+            </select>
+            <label class="meal-servings-row">
+                Porciones
+                <input class="meal-servings-input" type="number" min="1" max="20" value="${meal?.desired_servings || weeklyPlanState.defaultServings}" ${isLocked || !recipeId ? 'disabled' : ''}>
+            </label>
+            <div class="meal-slot-actions">
+                <button type="button" class="meal-slot-btn ${isLocked ? 'active' : ''}" data-action="lock" ${!recipeId ? 'disabled' : ''}>${isLocked ? 'Desbloquear' : 'Bloquear'}</button>
+                <button type="button" class="meal-slot-btn" data-action="move" ${isLocked || !recipeId && !weeklyPlanState.movingKey ? 'disabled' : ''}>Mover</button>
+                <button type="button" class="meal-slot-btn ${isCooked ? 'active' : ''}" data-action="cooked" ${!recipeId ? 'disabled' : ''}>${isCooked ? 'Desmarcar' : 'Cocinada'}</button>
+            </div>
+        </div>
+    `;
+}
+
+function renderWeeklyPlan() {
+    const grid = document.getElementById('weekly-plan-grid');
+    const range = document.getElementById('weekly-plan-range');
+    if (!grid || !range) return;
+
+    const weekEnd = sumarDias(weeklyPlanState.weekStart, 6);
+    const formatter = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' });
+    range.textContent = `${formatter.format(weeklyPlanState.weekStart)} – ${formatter.format(weekEnd)}`;
+
+    grid.innerHTML = Array.from({ length: 7 }, (_, dayIndex) => {
+        const dateObject = sumarDias(weeklyPlanState.weekStart, dayIndex);
+        const date = fechaLocalISO(dateObject);
+        const dayName = new Intl.DateTimeFormat('es-AR', { weekday: 'long' }).format(dateObject);
+        const dayLabel = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' }).format(dateObject);
+
+        return `
+            <section class="week-day-card">
+                <div class="week-day-heading">
+                    <strong>${dayName}</strong>
+                    <span>${dayLabel}</span>
+                </div>
+                <div class="day-meals">
+                    ${WEEKLY_MEAL_TYPES.map(type => renderWeeklyMealSlot(date, type.key, type.label)).join('')}
+                </div>
+            </section>
+        `;
+    }).join('');
+
+    const moveHint = document.getElementById('weekly-move-hint');
+    moveHint?.classList.toggle('hidden', !weeklyPlanState.movingKey);
+}
+
+async function loadWeeklyPlan() {
+    if (currentPlanState.plan !== 'premium') return;
+
+    const loadVersion = ++weeklyPlanState.loadVersion;
+    const grid = document.getElementById('weekly-plan-grid');
+    if (grid) grid.innerHTML = '<p class="weekly-empty-state">Cargando tu semana…</p>';
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || loadVersion !== weeklyPlanState.loadVersion) return;
+
+    const weekStart = fechaLocalISO(weeklyPlanState.weekStart);
+    const [recipesResult, preferencesResult] = await Promise.all([
+        supabase.from('saved_recipes').select('*').eq('user_id', user.id).order('title'),
+        supabase.rpc('get_my_recipe_preferences')
+    ]);
+
+    if (recipesResult.error || preferencesResult.error) {
+        trackTechnicalError('weekly_plan_dependencies_load', recipesResult.error || preferencesResult.error);
+        showAlert('Error', 'No se pudo preparar el plan semanal.', 'error');
+        return;
+    }
+
+    const { data: plan, error: planError } = await supabase
+        .from('weekly_plans')
+        .upsert({ user_id: user.id, week_start: weekStart, updated_at: new Date().toISOString() }, {
+            onConflict: 'user_id,week_start'
+        })
+        .select('*')
+        .single();
+
+    if (planError || loadVersion !== weeklyPlanState.loadVersion) {
+        trackTechnicalError('weekly_plan_load', planError);
+        showAlert('Error', 'No se pudo cargar esta semana.', 'error');
+        return;
+    }
+
+    const { data: meals, error: mealsError } = await supabase
+        .from('weekly_plan_meals')
+        .select('*')
+        .eq('plan_id', plan.id);
+
+    if (mealsError || loadVersion !== weeklyPlanState.loadVersion) {
+        trackTechnicalError('weekly_meals_load', mealsError);
+        showAlert('Error', 'No se pudieron cargar las comidas.', 'error');
+        return;
+    }
+
+    weeklyPlanState.planId = plan.id;
+    weeklyPlanState.userId = user.id;
+    weeklyPlanState.recipes = recipesResult.data || [];
+    weeklyPlanState.defaultServings = Number(preferencesResult.data?.default_servings) || 2;
+    weeklyPlanState.meals = new Map((meals || []).map(meal => [
+        crearMealKey(meal.meal_date, meal.meal_type),
+        meal
+    ]));
+    weeklyPlanState.movingKey = null;
+    renderWeeklyPlan();
+}
+
+async function guardarWeeklyMeal(key, content) {
+    const { mealDate, mealType } = separarMealKey(key);
+
+    if (!content?.saved_recipe_id) {
+        const existing = weeklyPlanState.meals.get(key);
+        if (existing?.id) {
+            const { error } = await supabase.from('weekly_plan_meals').delete().eq('id', existing.id);
+            if (error) throw error;
+        }
+        weeklyPlanState.meals.delete(key);
+        return;
+    }
+
+    const payload = {
+        plan_id: weeklyPlanState.planId,
+        user_id: weeklyPlanState.userId,
+        meal_date: mealDate,
+        meal_type: mealType,
+        saved_recipe_id: String(content.saved_recipe_id),
+        recipe_snapshot: content.recipe_snapshot || {},
+        desired_servings: Math.min(Math.max(Number(content.desired_servings) || 2, 1), 20),
+        is_locked: Boolean(content.is_locked),
+        is_cooked: Boolean(content.is_cooked),
+        updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+        .from('weekly_plan_meals')
+        .upsert(payload, { onConflict: 'plan_id,meal_date,meal_type' })
+        .select('*')
+        .single();
+
+    if (error) throw error;
+    weeklyPlanState.meals.set(key, data);
+}
+
+document.getElementById('weekly-plan-grid').addEventListener('change', async event => {
+    const slot = event.target.closest('.meal-slot');
+    if (!slot) return;
+
+    const key = slot.dataset.mealKey;
+    try {
+        if (event.target.classList.contains('meal-recipe-select')) {
+            const recipe = weeklyPlanState.recipes.find(item => String(item.id) === event.target.value);
+            if (!recipe) {
+                await guardarWeeklyMeal(key, null);
+            } else {
+                await guardarWeeklyMeal(key, {
+                    saved_recipe_id: recipe.id,
+                    recipe_snapshot: crearRecipeSnapshot(recipe),
+                    desired_servings: weeklyPlanState.defaultServings || recipe.servings || 2,
+                    is_locked: false,
+                    is_cooked: false
+                });
+            }
+        }
+
+        if (event.target.classList.contains('meal-servings-input')) {
+            const meal = weeklyPlanState.meals.get(key);
+            if (meal) {
+                await guardarWeeklyMeal(key, {
+                    ...meal,
+                    desired_servings: event.target.value
+                });
+            }
+        }
+
+        renderWeeklyPlan();
+    } catch (error) {
+        trackTechnicalError('weekly_meal_change', error);
+        showAlert('Error', 'No se pudo guardar el cambio.', 'error');
+        await loadWeeklyPlan();
+    }
+});
+
+document.getElementById('weekly-plan-grid').addEventListener('click', async event => {
+    const actionButton = event.target.closest('[data-action]');
+    const slot = event.target.closest('.meal-slot');
+    if (!actionButton || !slot) return;
+
+    const key = slot.dataset.mealKey;
+    const meal = weeklyPlanState.meals.get(key);
+    const action = actionButton.dataset.action;
+
+    try {
+        if (action === 'lock' && meal) {
+            await guardarWeeklyMeal(key, { ...meal, is_locked: !meal.is_locked });
+        }
+
+        if (action === 'cooked' && meal) {
+            const isCooked = !meal.is_cooked;
+            await guardarWeeklyMeal(key, { ...meal, is_cooked: isCooked });
+            if (isCooked) {
+                trackAnalyticsEvent('recipe_marked_cooked', {
+                    recipe_id: await crearHuellaPrivada(meal.saved_recipe_id),
+                    source: 'weekly_plan'
+                });
+            }
+        }
+
+        if (action === 'move') {
+            if (!weeklyPlanState.movingKey) {
+                if (!meal || meal.is_locked) return;
+                weeklyPlanState.movingKey = key;
+            } else if (weeklyPlanState.movingKey === key) {
+                weeklyPlanState.movingKey = null;
+            } else {
+                const sourceKey = weeklyPlanState.movingKey;
+                const sourceMeal = weeklyPlanState.meals.get(sourceKey);
+                const targetMeal = weeklyPlanState.meals.get(key);
+
+                if (targetMeal?.is_locked) {
+                    showAlert('Horario bloqueado', 'Desbloquealo antes de mover una receta.', 'warning');
+                    return;
+                }
+
+                weeklyPlanState.movingKey = null;
+                const sourceSlot = separarMealKey(sourceKey);
+                const targetSlot = separarMealKey(key);
+                const { error } = await supabase.rpc('move_weekly_plan_meal', {
+                    p_plan_id: weeklyPlanState.planId,
+                    p_source_date: sourceSlot.mealDate,
+                    p_source_type: sourceSlot.mealType,
+                    p_target_date: targetSlot.mealDate,
+                    p_target_type: targetSlot.mealType
+                });
+
+                if (error) throw error;
+                await loadWeeklyPlan();
+                return;
+            }
+        }
+
+        renderWeeklyPlan();
+    } catch (error) {
+        trackTechnicalError('weekly_meal_action', error);
+        showAlert('Error', 'No se pudo actualizar el plan.', 'error');
+        await loadWeeklyPlan();
+    }
+});
+
+document.getElementById('autofill-week-btn').addEventListener('click', async () => {
+    if (weeklyPlanState.recipes.length === 0) {
+        showAlert('Faltan favoritas', 'Guardá al menos una receta antes de completar la semana.', 'warning');
+        return;
+    }
+
+    const emptySlots = obtenerSlotsSemana().filter(slot => {
+        const meal = weeklyPlanState.meals.get(crearMealKey(slot.date, slot.mealType));
+        return !meal?.saved_recipe_id && !meal?.is_locked;
+    });
+
+    if (emptySlots.length === 0) {
+        showAlert('Semana completa', 'No hay espacios vacíos para completar.', 'info');
+        return;
+    }
+
+    try {
+        const payloads = emptySlots.map((slot, index) => {
+            const recipe = weeklyPlanState.recipes[index % weeklyPlanState.recipes.length];
+            return {
+                plan_id: weeklyPlanState.planId,
+                user_id: weeklyPlanState.userId,
+                meal_date: slot.date,
+                meal_type: slot.mealType,
+                saved_recipe_id: String(recipe.id),
+                recipe_snapshot: crearRecipeSnapshot(recipe),
+                desired_servings: weeklyPlanState.defaultServings || recipe.servings || 2,
+                is_locked: false,
+                is_cooked: false,
+                updated_at: new Date().toISOString()
+            };
+        });
+
+        const { data, error } = await supabase
+            .from('weekly_plan_meals')
+            .upsert(payloads, { onConflict: 'plan_id,meal_date,meal_type' })
+            .select('*');
+
+        if (error) throw error;
+        (data || []).forEach(meal => {
+            weeklyPlanState.meals.set(crearMealKey(meal.meal_date, meal.meal_type), meal);
+        });
+
+        renderWeeklyPlan();
+        showAlert('Semana completada', 'Se llenaron los espacios usando tus favoritas.', 'success');
+    } catch (error) {
+        trackTechnicalError('weekly_plan_autofill', error);
+        showAlert('Error', 'No se pudo completar toda la semana.', 'error');
+        await loadWeeklyPlan();
+    }
+});
+
+document.getElementById('clear-week-btn').addEventListener('click', async () => {
+    try {
+        const { error } = await supabase
+            .from('weekly_plan_meals')
+            .delete()
+            .eq('plan_id', weeklyPlanState.planId)
+            .eq('is_locked', false);
+
+        if (error) throw error;
+
+        weeklyPlanState.meals = new Map(
+            [...weeklyPlanState.meals].filter(([, meal]) => meal.is_locked)
+        );
+        weeklyPlanState.movingKey = null;
+        renderWeeklyPlan();
+        showAlert('Plan actualizado', 'Se conservaron únicamente las comidas bloqueadas.', 'info');
+    } catch (error) {
+        trackTechnicalError('weekly_plan_clear', error);
+        showAlert('Error', 'No se pudo limpiar la semana.', 'error');
+    }
+});
+
+document.getElementById('previous-week-btn').addEventListener('click', () => {
+    weeklyPlanState.weekStart = sumarDias(weeklyPlanState.weekStart, -7);
+    loadWeeklyPlan();
+});
+
+document.getElementById('next-week-btn').addEventListener('click', () => {
+    weeklyPlanState.weekStart = sumarDias(weeklyPlanState.weekStart, 7);
+    loadWeeklyPlan();
+});
+
+const shoppingListState = {
+    listId: null,
+    userId: null,
+    items: [],
+    loadVersion: 0
+};
+
+function normalizarClaveCompra(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLocaleLowerCase('es')
+        .replace(/\s+/g, ' ')
+        .slice(0, 100);
+}
+
+function redondearCantidadCompra(value) {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function calcularComprasDesdePlan(pantryItems) {
+    const required = new Map();
+    const pantry = new Map();
+
+    (pantryItems || []).forEach(item => {
+        const nameKey = normalizarClaveCompra(item.ingredient);
+        const unit = String(item.unit || 'unidad').trim().toLocaleLowerCase('es');
+        if (!nameKey) return;
+        const key = `${nameKey}|${unit}`;
+        pantry.set(key, (pantry.get(key) || 0) + (Number(item.quantity) || 0));
+    });
+
+    [...weeklyPlanState.meals.values()]
+        .filter(meal => meal.saved_recipe_id && !meal.is_cooked)
+        .forEach(meal => {
+            const snapshot = meal.recipe_snapshot || {};
+            const baseServings = Math.max(Number(snapshot.servings) || 2, 1);
+            const multiplier = Math.max(Number(meal.desired_servings) || baseServings, 1) / baseServings;
+
+            (Array.isArray(snapshot.required_ingredients) ? snapshot.required_ingredients : []).forEach(item => {
+                const name = String(item?.name || '').trim();
+                const nameKey = normalizarClaveCompra(name);
+                const unit = String(item?.unit || 'unidad').trim().toLocaleLowerCase('es');
+                const quantity = Number(item?.quantity);
+                if (!nameKey || !Number.isFinite(quantity) || quantity <= 0) return;
+
+                const key = `${nameKey}|${unit}`;
+                const current = required.get(key) || { name, unit, quantity: 0 };
+                current.quantity += quantity * multiplier;
+                required.set(key, current);
+            });
+        });
+
+    return [...required.entries()].map(([sourceKey, item]) => ({
+        source_key: sourceKey,
+        name: item.name,
+        unit: item.unit,
+        quantity: redondearCantidadCompra(Math.max(item.quantity - (pantry.get(sourceKey) || 0), 0))
+    })).filter(item => item.quantity > 0);
+}
+
+function renderShoppingList() {
+    const container = document.getElementById('shopping-list-items');
+    const summary = document.getElementById('shopping-list-summary');
+    const range = document.getElementById('shopping-list-range');
+    if (!container || !summary || !range) return;
+
+    const weekEnd = sumarDias(weeklyPlanState.weekStart, 6);
+    const formatter = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' });
+    range.textContent = `${formatter.format(weeklyPlanState.weekStart)} – ${formatter.format(weekEnd)}`;
+
+    const pending = shoppingListState.items.filter(item => !item.is_checked);
+    const checked = shoppingListState.items.filter(item => item.is_checked);
+    summary.innerHTML = `<strong>${pending.length}</strong> pendientes · <strong>${checked.length}</strong> comprados`;
+
+    if (shoppingListState.items.length === 0) {
+        container.innerHTML = `
+            <div class="shopping-empty-state">
+                <span>✓</span>
+                <strong>No falta comprar nada</strong>
+                <p>Agregá recetas al plan o sumá productos manualmente.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const renderGroup = (title, items, checkedGroup) => items.length === 0 ? '' : `
+        <section class="shopping-group">
+            <h3>${title}</h3>
+            ${items.map(item => `
+                <div class="shopping-item ${checkedGroup ? 'is-checked' : ''}" data-shopping-item-id="${escaparHTML(item.id)}">
+                    <label>
+                        <input type="checkbox" class="shopping-item-check" ${item.is_checked ? 'checked' : ''}>
+                        <span class="shopping-checkmark"></span>
+                        <span class="shopping-item-info">
+                            <strong>${escaparHTML(item.name)}</strong>
+                            <small>${formatearCantidad(item.quantity)} ${escaparHTML(item.unit)}</small>
+                        </span>
+                    </label>
+                    <span class="shopping-item-origin">${item.source_type === 'manual' ? 'Agregado' : 'Plan'}</span>
+                    ${item.source_type === 'manual'
+                        ? '<button type="button" class="shopping-item-delete" aria-label="Eliminar producto">×</button>'
+                        : ''}
+                </div>
+            `).join('')}
+        </section>
+    `;
+
+    container.innerHTML = renderGroup('Por comprar', pending, false) + renderGroup('Comprados', checked, true);
+}
+
+async function sincronizarComprasDelPlan(existingItems, pantryItems) {
+    const desiredItems = calcularComprasDesdePlan(pantryItems);
+    const existingPlanItems = new Map(
+        existingItems
+            .filter(item => item.source_type === 'plan')
+            .map(item => [item.source_key, item])
+    );
+    const desiredKeys = new Set(desiredItems.map(item => item.source_key));
+    const obsoleteIds = [...existingPlanItems.values()]
+        .filter(item => !desiredKeys.has(item.source_key))
+        .map(item => item.id);
+
+    if (obsoleteIds.length > 0) {
+        const { error } = await supabase.from('shopping_list_items').delete().in('id', obsoleteIds);
+        if (error) throw error;
+    }
+
+    if (desiredItems.length > 0) {
+        const payload = desiredItems.map(item => ({
+            list_id: shoppingListState.listId,
+            user_id: shoppingListState.userId,
+            source_type: 'plan',
+            source_key: item.source_key,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            is_checked: Boolean(existingPlanItems.get(item.source_key)?.is_checked),
+            updated_at: new Date().toISOString()
+        }));
+        const { error } = await supabase
+            .from('shopping_list_items')
+            .upsert(payload, { onConflict: 'list_id,source_type,source_key' });
+        if (error) throw error;
+    }
+
+    trackAnalyticsEvent('shopping_list_synced', {
+        generated_item_count: desiredItems.length,
+        planned_meal_count: [...weeklyPlanState.meals.values()].filter(meal => meal.saved_recipe_id && !meal.is_cooked).length
+    });
+}
+
+async function loadShoppingList({ syncFromPlan = true } = {}) {
+    if (currentPlanState.plan !== 'premium' || !weeklyPlanState.planId) return;
+
+    const loadVersion = ++shoppingListState.loadVersion;
+    const container = document.getElementById('shopping-list-items');
+    if (container) container.innerHTML = '<p class="weekly-empty-state">Preparando tu lista…</p>';
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || loadVersion !== shoppingListState.loadVersion) return;
+
+        const { data: list, error: listError } = await supabase
+            .from('shopping_lists')
+            .upsert({
+                user_id: user.id,
+                weekly_plan_id: weeklyPlanState.planId,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,weekly_plan_id' })
+            .select('*')
+            .single();
+        if (listError) throw listError;
+
+        shoppingListState.listId = list.id;
+        shoppingListState.userId = user.id;
+
+        const [itemsResult, pantryResult] = await Promise.all([
+            supabase.from('shopping_list_items').select('*').eq('list_id', list.id),
+            supabase.from('pantry').select('ingredient,quantity,unit').eq('user_id', user.id)
+        ]);
+        if (itemsResult.error || pantryResult.error) throw itemsResult.error || pantryResult.error;
+
+        if (syncFromPlan) {
+            await sincronizarComprasDelPlan(itemsResult.data || [], pantryResult.data || []);
+        }
+
+        const { data: finalItems, error: finalError } = await supabase
+            .from('shopping_list_items')
+            .select('*')
+            .eq('list_id', list.id)
+            .order('is_checked')
+            .order('name');
+        if (finalError) throw finalError;
+        if (loadVersion !== shoppingListState.loadVersion) return;
+
+        shoppingListState.items = finalItems || [];
+        renderShoppingList();
+    } catch (error) {
+        trackTechnicalError('shopping_list_load', error);
+        showAlert('Error', 'No se pudo preparar la lista de compras.', 'error');
+    }
+}
+
+document.getElementById('open-shopping-list-btn').addEventListener('click', async () => {
+    if (currentPlanState.plan !== 'premium') return;
+    mostrarSubVista(viewShoppingList, tabWeeklyPlan, 'shopping_list');
+    trackAnalyticsEvent('shopping_list_opened');
+    await loadShoppingList();
+});
+
+document.getElementById('back-to-weekly-plan-btn').addEventListener('click', () => {
+    mostrarSubVista(viewWeeklyPlan, tabWeeklyPlan, 'weekly_plan');
+});
+
+document.getElementById('refresh-shopping-list-btn').addEventListener('click', async event => {
+    event.currentTarget.disabled = true;
+    await loadWeeklyPlan();
+    await loadShoppingList();
+    event.currentTarget.disabled = false;
+});
+
+document.getElementById('shopping-manual-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const nameInput = document.getElementById('shopping-item-name');
+    const quantityInput = document.getElementById('shopping-item-quantity');
+    const unitInput = document.getElementById('shopping-item-unit');
+    const name = nameInput.value.trim();
+    const quantity = Number(quantityInput.value);
+
+    if (!name || !Number.isFinite(quantity) || quantity <= 0 || !shoppingListState.listId) {
+        showAlert('Producto inválido', 'Ingresá un nombre y una cantidad mayor que cero.', 'warning');
+        return;
+    }
+
+    const { error } = await supabase.from('shopping_list_items').insert({
+        list_id: shoppingListState.listId,
+        user_id: shoppingListState.userId,
+        source_type: 'manual',
+        source_key: crearIdAnonimo(),
+        name: name.slice(0, 100),
+        quantity: Math.min(quantity, 99999),
+        unit: unitInput.value,
+        is_checked: false
+    });
+
+    if (error) {
+        trackTechnicalError('shopping_manual_item_add', error);
+        showAlert('Error', 'No se pudo agregar el producto.', 'error');
+        return;
+    }
+
+    nameInput.value = '';
+    quantityInput.value = '1';
+    trackAnalyticsEvent('shopping_manual_item_added');
+    await loadShoppingList({ syncFromPlan: false });
+});
+
+document.getElementById('shopping-list-items').addEventListener('change', async event => {
+    if (!event.target.classList.contains('shopping-item-check')) return;
+    const row = event.target.closest('[data-shopping-item-id]');
+    const item = shoppingListState.items.find(entry => String(entry.id) === row?.dataset.shoppingItemId);
+    if (!item) return;
+
+    const isChecked = event.target.checked;
+    const { error } = await supabase
+        .from('shopping_list_items')
+        .update({ is_checked: isChecked, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+
+    if (error) {
+        trackTechnicalError('shopping_item_check', error);
+        showAlert('Error', 'No se pudo actualizar el producto.', 'error');
+        event.target.checked = !isChecked;
+        return;
+    }
+
+    trackAnalyticsEvent('shopping_item_checked', {
+        checked: isChecked,
+        source_type: item.source_type
+    });
+    await loadShoppingList({ syncFromPlan: false });
+});
+
+document.getElementById('shopping-list-items').addEventListener('click', async event => {
+    const deleteButton = event.target.closest('.shopping-item-delete');
+    if (!deleteButton) return;
+    const row = deleteButton.closest('[data-shopping-item-id]');
+    const item = shoppingListState.items.find(entry => String(entry.id) === row?.dataset.shoppingItemId);
+    if (!item || item.source_type !== 'manual') return;
+
+    const { error } = await supabase.from('shopping_list_items').delete().eq('id', item.id);
+    if (error) {
+        trackTechnicalError('shopping_manual_item_delete', error);
+        showAlert('Error', 'No se pudo eliminar el producto.', 'error');
+        return;
+    }
+    await loadShoppingList({ syncFromPlan: false });
+});
+
+document.getElementById('clear-checked-shopping-btn').addEventListener('click', async () => {
+    const checkedManualIds = shoppingListState.items
+        .filter(item => item.is_checked && item.source_type === 'manual')
+        .map(item => item.id);
+    if (checkedManualIds.length === 0) {
+        showAlert('Lista al día', 'No hay productos agregados manualmente para borrar.', 'info');
+        return;
+    }
+
+    const { error } = await supabase.from('shopping_list_items').delete().in('id', checkedManualIds);
+    if (error) {
+        trackTechnicalError('shopping_checked_clear', error);
+        showAlert('Error', 'No se pudieron borrar los productos.', 'error');
+        return;
+    }
+    await loadShoppingList({ syncFromPlan: false });
+});
+
+document.getElementById('share-shopping-list-btn').addEventListener('click', () => {
+    const pending = shoppingListState.items.filter(item => !item.is_checked);
+    if (pending.length === 0) {
+        showAlert('Lista completa', 'No quedan productos pendientes para compartir.', 'info');
+        return;
+    }
+
+    const lines = pending.map(item => `• ${formatearCantidad(item.quantity)} ${item.unit} de ${item.name}`);
+    const message = `Lista de compras de Alacena\n\n${lines.join('\n')}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    trackAnalyticsEvent('shopping_list_shared', { pending_item_count: pending.length });
 });
 
 async function loadSavedRecipes() {

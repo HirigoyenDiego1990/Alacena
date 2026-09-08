@@ -113,6 +113,79 @@
                 <div id="saved-recipes-list" class="recipe-list"></div>
             </div>
 
+            <!-- Sub-vista: Planificación semanal Premium -->
+            <div id="view-weekly-plan" class="sub-view hidden">
+                <h2 class="section-title">Plan semanal</h2>
+                <p class="section-sub">Organizá almuerzos y cenas usando tus recetas favoritas.</p>
+
+                <div id="weekly-plan-locked" class="weekly-plan-locked">
+                    <span class="weekly-plan-lock-icon">🔒</span>
+                    <h3>Función Premium</h3>
+                    <p>El plan semanal permite organizar, bloquear y marcar comidas para cada día.</p>
+                </div>
+
+                <div id="weekly-plan-content" class="weekly-plan-content hidden">
+                    <div class="week-navigation">
+                        <button type="button" id="previous-week-btn" class="week-nav-btn" aria-label="Semana anterior">‹</button>
+                        <div>
+                            <span class="week-navigation-label">Semana</span>
+                            <strong id="weekly-plan-range">—</strong>
+                        </div>
+                        <button type="button" id="next-week-btn" class="week-nav-btn" aria-label="Semana siguiente">›</button>
+                    </div>
+
+                    <div class="weekly-plan-actions">
+                        <button type="button" id="autofill-week-btn" class="weekly-secondary-btn">✨ Completar espacios</button>
+                        <button type="button" id="clear-week-btn" class="weekly-secondary-btn weekly-secondary-btn--danger">Borrar no bloqueadas</button>
+                        <button type="button" id="open-shopping-list-btn" class="weekly-secondary-btn weekly-secondary-btn--shopping">🛒 Lista de compras</button>
+                    </div>
+
+                    <p id="weekly-move-hint" class="weekly-move-hint hidden">Elegí “Mover” en el horario de destino.</p>
+                    <div id="weekly-plan-grid" class="weekly-plan-grid"></div>
+                </div>
+            </div>
+
+            <!-- Sub-vista: Lista de compras consolidada Premium -->
+            <div id="view-shopping-list" class="sub-view hidden">
+                <button type="button" id="back-to-weekly-plan-btn" class="shopping-back-btn">‹ Volver al plan</button>
+                <h2 class="section-title">Lista de compras</h2>
+                <p class="section-sub">Ingredientes que faltan para cocinar todas las recetas de la semana.</p>
+
+                <div class="shopping-list-toolbar">
+                    <div>
+                        <span class="shopping-list-label">Semana</span>
+                        <strong id="shopping-list-range">—</strong>
+                    </div>
+                    <button type="button" id="refresh-shopping-list-btn" class="shopping-refresh-btn">Actualizar desde el plan</button>
+                </div>
+
+                <div id="shopping-list-summary" class="shopping-list-summary">Preparando lista…</div>
+
+                <form id="shopping-manual-form" class="shopping-manual-form">
+                    <input type="text" id="shopping-item-name" maxlength="100" placeholder="Agregar otro producto…" aria-label="Producto">
+                    <input type="number" id="shopping-item-quantity" min="0.01" max="99999" step="0.01" value="1" aria-label="Cantidad">
+                    <select id="shopping-item-unit" aria-label="Unidad">
+                        <option value="unidad">unidad</option>
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="ml">ml</option>
+                        <option value="l">l</option>
+                        <option value="taza">taza</option>
+                        <option value="cda">cda</option>
+                        <option value="cdita">cdita</option>
+                        <option value="paquete">paquete</option>
+                    </select>
+                    <button type="submit" aria-label="Agregar a la lista">+</button>
+                </form>
+
+                <div id="shopping-list-items" class="shopping-list-items"></div>
+
+                <div class="shopping-list-footer">
+                    <button type="button" id="share-shopping-list-btn" class="shopping-share-btn">Compartir pendientes por WhatsApp</button>
+                    <button type="button" id="clear-checked-shopping-btn" class="shopping-clear-btn">Borrar agregados comprados</button>
+                </div>
+            </div>
+
             <!-- Sub-vista: Preferencias culinarias -->
             <div id="view-preferences" class="sub-view hidden">
                 <h2 class="section-title">Preferencias</h2>
@@ -255,6 +328,11 @@
             <button type="button" id="btn-delete-recipes" class="nav-btn nav-btn-delete-recipes" title="Borrar recetas de la pantalla">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                 <span>Borrar recetas</span>
+            </button>
+
+            <button type="button" id="tab-weekly-plan" class="nav-btn" data-target="weekly-plan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="m9 16 2 2 4-4"></path></svg>
+                <span>Plan</span>
             </button>
 
             <button type="button" id="tab-saved" class="nav-btn" data-target="saved">
