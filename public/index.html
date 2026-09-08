@@ -37,7 +37,7 @@
                     <h1 class="brand-title">Alacena</h1>
                     <div class="brand-meta-row">
                         <span class="brand-subtitle">Zafa con lo que hay</span>
-                        <span id="plan-badge" class="plan-badge plan-badge--free">Free</span>
+                        <button type="button" id="plan-badge" class="plan-badge plan-badge--free" aria-label="Ver planes">Free</button>
                     </div>
                 </div>
             </div>
@@ -70,12 +70,12 @@
                 <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
                 <div class="ingredient-bulk-card">
-                    <label for="ingredient-input" class="ingredient-bulk-label">Cargá todo junto</label>
+                    <label for="ingredient-input" class="ingredient-bulk-label">Cargá todos los ingredientes que tengas</label>
                     <textarea id="ingredient-input" rows="5" placeholder="500 g de arroz&#10;2 tomates&#10;1 l de leche" aria-describedby="ingredient-format-help"></textarea>
                     <p id="ingredient-format-help" class="ingredient-format-help">Un ingrediente por renglón, o separalos con comas. También podés escribir: <strong>arroz 500 g</strong>. Si ya existe, se actualiza su cantidad.</p>
 
                     <div id="ingredient-bulk-preview" class="ingredient-bulk-preview">
-                        <span class="ingredient-preview-empty">La vista previa aparecerá acá.</span>
+                        <span class="ingredient-preview-empty"></span>
                     </div>
 
                     <button type="button" id="add-ingredient-btn" class="add-ingredients-bulk-btn" disabled>
@@ -260,7 +260,7 @@
             <!-- Sub-vista: Preferencias culinarias -->
             <div id="view-preferences" class="sub-view hidden">
                 <h2 class="section-title">Preferencias</h2>
-                <p class="section-sub">Personalizá las recetas sin compartir estas preferencias con Analytics.</p>
+                <p class="section-sub">Personalizá las recetas según tus nesecidades o gustos.</p>
 
                 <form id="preferences-form" class="preferences-form">
                     <div class="preference-section">
@@ -343,6 +343,63 @@
                     <p class="preference-safety-note">Si tenés una alergia grave, verificá siempre los ingredientes antes de cocinar. Alacena no reemplaza asesoramiento médico.</p>
                     <button type="submit" id="save-preferences-btn" class="btn btn-primary">Guardar preferencias</button>
                 </form>
+            </div>
+
+            <!-- Sub-vista: Planes Free y Premium -->
+            <div id="view-plans" class="sub-view hidden">
+                <button type="button" id="back-from-plans-btn" class="shopping-back-btn">‹ Volver</button>
+
+                <section class="plans-hero">
+                    <span class="plans-eyebrow">Elegí cómo cocinar</span>
+                    <h2>Alacena Free y Premium</h2>
+                    <p>La misma idea simple: contanos qué tenés y convertí esos ingredientes en comidas.</p>
+                    <span id="plans-current-badge" class="plans-current-badge">Tu plan actual: Free</span>
+                </section>
+
+                <section class="plans-usage-card">
+                    <div class="plans-usage-heading">
+                        <span>Generaciones de hoy</span>
+                        <strong id="plans-usage-text">0 de 3 usadas</strong>
+                    </div>
+                    <div class="plans-usage-track"><div id="plans-usage-fill"></div></div>
+                    <small id="plans-results-text">Cada generación entrega 2 recetas y 1 sugerencia.</small>
+                </section>
+
+                <div class="plans-comparison">
+                    <article id="free-plan-card" class="plan-option-card">
+                        <div class="plan-option-heading">
+                            <div><span>Para empezar</span><h3>Free</h3></div>
+                            <strong>Gratis</strong>
+                        </div>
+                        <ul>
+                            <li><strong>3</strong> generaciones por día</li>
+                            <li><strong>2 recetas + 1 sugerencia</strong> por generación</li>
+                            <li>Hasta <strong>20 ingredientes</strong></li>
+                            <li>Hasta <strong>10 favoritas</strong></li>
+                            <li>Preferencias alimentarias básicas</li>
+                        </ul>
+                        <span id="free-current-label" class="plan-current-label hidden">Tu plan actual</span>
+                    </article>
+
+                    <article id="premium-plan-card" class="plan-option-card plan-option-card--premium">
+                        <div class="plan-option-heading">
+                            <div><span>Para organizarte</span><h3>Premium</h3></div>
+                            <strong>Todo desbloqueado</strong>
+                        </div>
+                        <ul>
+                            <li><strong>50</strong> generaciones por día</li>
+                            <li><strong>5 recetas + 3 sugerencias</strong> por generación</li>
+                            <li>Ingredientes y favoritas sin límite</li>
+                            <li>Preferencias avanzadas y objetivos</li>
+                            <li>Plan semanal y lista consolidada</li>
+                            <li>Presupuesto, historial y colecciones</li>
+                        </ul>
+                        <button type="button" id="request-premium-btn" class="request-premium-btn">Solicitar acceso Premium</button>
+                        <p id="premium-request-status" class="premium-request-status"></p>
+                    </article>
+                </div>
+
+                <p class="plans-payment-note">La activación y los pagos se conectarán próximamente. Solicitar acceso no genera ningún cobro.</p>
             </div>
 
             <!-- VISTA: MODO COCINA PASO A PASO -->

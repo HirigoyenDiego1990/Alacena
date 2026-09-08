@@ -654,6 +654,11 @@ button[type="submit"]:hover {
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.plan-badge:hover {
+  transform: translateY(-1px);
 }
 
 .plan-badge--free {
@@ -666,6 +671,248 @@ button[type="submit"]:hover {
   color: var(--ink);
   background: linear-gradient(135deg, var(--saffron), #f6c96f);
   border: 1px solid rgba(246, 201, 111, 0.8);
+}
+
+/* ============================================
+   PANTALLA DE PLANES
+   ============================================ */
+
+.plans-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 24px 20px;
+  border: 1px solid rgba(232, 163, 61, 0.24);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(232, 163, 61, 0.13), rgba(124, 148, 115, 0.08));
+}
+
+.plans-hero::after {
+  content: '';
+  position: absolute;
+  top: -45px;
+  right: -40px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(232, 163, 61, 0.08);
+}
+
+.plans-eyebrow {
+  color: var(--saffron);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.plans-hero h2 {
+  position: relative;
+  z-index: 1;
+  margin: 7px 0 8px;
+  color: var(--cream-text);
+  font-family: 'Fraunces', serif;
+  font-size: 25px;
+}
+
+.plans-hero p {
+  position: relative;
+  z-index: 1;
+  max-width: 500px;
+  margin: 0 0 15px;
+  color: rgba(243, 239, 226, 0.58);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.plans-current-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: var(--saffron);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.plans-usage-card {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 13px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.plans-usage-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  color: rgba(243, 239, 226, 0.48);
+  font-size: 9.5px;
+}
+
+.plans-usage-heading strong {
+  color: var(--cream-text);
+}
+
+.plans-usage-track {
+  overflow: hidden;
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(251, 246, 236, 0.07);
+}
+
+#plans-usage-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--saffron), #e76f51);
+  transition: width 0.35s ease;
+}
+
+.plans-usage-card small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 8.5px;
+}
+
+.plans-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.plan-option-card {
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 17px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.plan-option-card--premium {
+  border-color: rgba(232, 163, 61, 0.3);
+  background: linear-gradient(155deg, rgba(232, 163, 61, 0.1), rgba(251, 246, 236, 0.025));
+}
+
+.plan-option-card.is-current {
+  box-shadow: inset 0 0 0 1px rgba(124, 148, 115, 0.3);
+}
+
+.plan-option-card--premium.is-current {
+  box-shadow: inset 0 0 0 1px rgba(232, 163, 61, 0.5);
+}
+
+.plan-option-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid rgba(251, 246, 236, 0.07);
+}
+
+.plan-option-heading span {
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.plan-option-heading h3 {
+  margin: 3px 0 0;
+  color: var(--cream-text);
+  font-size: 19px;
+}
+
+.plan-option-heading > strong {
+  color: var(--saffron);
+  font-size: 9px;
+  text-align: right;
+}
+
+.plan-option-card ul {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-option-card li {
+  position: relative;
+  padding-left: 17px;
+  color: rgba(243, 239, 226, 0.58);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.plan-option-card li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #9fbd95;
+  font-weight: 800;
+}
+
+.plan-option-card li strong {
+  color: var(--cream-text);
+}
+
+.plan-current-label {
+  display: block;
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(124, 148, 115, 0.12);
+  color: #b8cfaf;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.request-premium-btn {
+  width: 100%;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--saffron), #f1b654);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.request-premium-btn:disabled {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.premium-request-status {
+  min-height: 26px;
+  margin: 8px 0 0;
+  color: rgba(243, 239, 226, 0.43);
+  font-size: 8.5px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.plans-payment-note {
+  margin: 14px 0 0;
+  color: rgba(243, 239, 226, 0.34);
+  font-size: 8.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .plans-comparison {
+    grid-template-columns: 1fr;
+  }
 }
 
 .generation-action-box {

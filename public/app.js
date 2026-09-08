@@ -249,6 +249,7 @@ function aplicarEstadoPlan(planData) {
     if (weeklyPlanLocked) weeklyPlanLocked.classList.toggle('hidden', isPremium);
     if (weeklyPlanContent) weeklyPlanContent.classList.toggle('hidden', !isPremium);
     if (savedPremiumTools) savedPremiumTools.classList.toggle('hidden', !isPremium);
+    updatePlansView();
 
 }
 
@@ -801,13 +802,14 @@ const viewSaved = document.getElementById('view-saved');
 const viewPreferences = document.getElementById('view-preferences');
 const viewWeeklyPlan = document.getElementById('view-weekly-plan');
 const viewShoppingList = document.getElementById('view-shopping-list');
+const viewPlans = document.getElementById('view-plans');
 const tabSaved = document.getElementById('tab-saved');
 const tabCook = document.querySelector('nav button:first-child');
 const tabPreferences = document.getElementById('tab-preferences');
 const tabWeeklyPlan = document.getElementById('tab-weekly-plan');
 
 function mostrarSubVista(view, activeTab, screenName) {
-    [viewCook, viewSaved, viewPreferences, viewWeeklyPlan, viewShoppingList].forEach(item => item?.classList.add('hidden'));
+    [viewCook, viewSaved, viewPreferences, viewWeeklyPlan, viewShoppingList, viewPlans].forEach(item => item?.classList.add('hidden'));
     [tabCook, tabSaved, tabPreferences, tabWeeklyPlan].forEach(item => item?.classList.remove('active'));
 
     view?.classList.remove('hidden');
@@ -832,6 +834,129 @@ tabPreferences.addEventListener('click', () => {
 tabWeeklyPlan.addEventListener('click', () => {
     mostrarSubVista(viewWeeklyPlan, tabWeeklyPlan, 'weekly_plan');
     if (currentPlanState.plan === 'premium') loadWeeklyPlan();
+});
+
+let plansReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
+
+function obtenerVistaActualParaVolver() {
+    if (!viewShoppingList.classList.contains('hidden')) {
+        return { view: viewShoppingList, tab: tabWeeklyPlan, screen: 'shopping_list' };
+    }
+    if (!viewWeeklyPlan.classList.contains('hidden')) {
+        return { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' };
+    }
+    if (!viewSaved.classList.contains('hidden')) {
+        return { view: viewSaved, tab: tabSaved, screen: 'saved_recipes' };
+    }
+    if (!viewPreferences.classList.contains('hidden')) {
+        return { view: viewPreferences, tab: tabPreferences, screen: 'preferences' };
+    }
+    return { view: viewCook, tab: tabCook, screen: 'cook' };
+}
+
+function updatePlansView() {
+    const isPremium = currentPlanState.plan === 'premium';
+    const used = Math.max(Number(currentPlanState.generation_used) || 0, 0);
+    const limit = Math.max(Number(currentPlanState.generation_limit) || 1, 1);
+    const usagePercent = Math.min((used / limit) * 100, 100);
+    const currentBadge = document.getElementById('plans-current-badge');
+    const usageText = document.getElementById('plans-usage-text');
+    const usageFill = document.getElementById('plans-usage-fill');
+    const resultsText = document.getElementById('plans-results-text');
+    const freeLabel = document.getElementById('free-current-label');
+    const freeCard = document.getElementById('free-plan-card');
+    const premiumCard = document.getElementById('premium-plan-card');
+    const requestButton = document.getElementById('request-premium-btn');
+
+    if (currentBadge) currentBadge.textContent = `Tu plan actual: ${isPremium ? 'Premium' : 'Free'}`;
+    if (usageText) usageText.textContent = `${used} de ${limit} usadas`;
+    if (usageFill) usageFill.style.width = `${usagePercent}%`;
+    if (resultsText) {
+        resultsText.textContent = `Cada generación entrega ${currentPlanState.alacena_results} recetas y ${currentPlanState.suggestion_results} ${currentPlanState.suggestion_results === 1 ? 'sugerencia' : 'sugerencias'}.`;
+    }
+    freeLabel?.classList.toggle('hidden', isPremium);
+    freeCard?.classList.toggle('is-current', !isPremium);
+    premiumCard?.classList.toggle('is-current', isPremium);
+
+    if (requestButton && isPremium) {
+        requestButton.disabled = true;
+        requestButton.textContent = 'Tu plan Premium está activo';
+    } else if (requestButton) {
+        requestButton.disabled = false;
+        requestButton.textContent = 'Solicitar acceso Premium';
+    }
+}
+
+async function loadPremiumRequestStatus() {
+    updatePlansView();
+    const statusText = document.getElementById('premium-request-status');
+    const requestButton = document.getElementById('request-premium-btn');
+    if (currentPlanState.plan === 'premium') {
+        statusText.textContent = 'Todas las funciones están desbloqueadas en esta cuenta.';
+        return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data, error } = await supabase
+        .from('premium_upgrade_requests')
+        .select('status,requested_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (error) {
+        trackTechnicalError('premium_request_status_load', error);
+        statusText.textContent = 'No pudimos consultar el estado de la solicitud.';
+        return;
+    }
+
+    if (data?.status === 'pending' || data?.status === 'contacted') {
+        requestButton.disabled = true;
+        requestButton.textContent = 'Solicitud enviada';
+        statusText.textContent = 'Tu solicitud está registrada. Solicitar acceso no genera ningún cobro.';
+    } else if (data?.status === 'approved') {
+        requestButton.disabled = true;
+        requestButton.textContent = 'Solicitud aprobada';
+        statusText.textContent = 'El acceso fue aprobado. Volvé a entrar si el plan todavía figura como Free.';
+    } else if (data?.status === 'rejected' || data?.status === 'cancelled') {
+        statusText.textContent = 'Podés enviar una nueva solicitud cuando quieras.';
+    } else {
+        statusText.textContent = 'Registrá tu interés para acceder cuando habilitemos la activación.';
+    }
+}
+
+document.getElementById('plan-badge').addEventListener('click', async () => {
+    plansReturnState = obtenerVistaActualParaVolver();
+    mostrarSubVista(viewPlans, null, 'plans');
+    await loadPlanState();
+    await loadPremiumRequestStatus();
+});
+
+document.getElementById('back-from-plans-btn').addEventListener('click', () => {
+    mostrarSubVista(plansReturnState.view, plansReturnState.tab, plansReturnState.screen);
+});
+
+document.getElementById('request-premium-btn').addEventListener('click', async event => {
+    if (currentPlanState.plan === 'premium') return;
+    event.currentTarget.disabled = true;
+
+    const { data, error } = await supabase.rpc('request_premium_upgrade');
+    if (error) {
+        trackTechnicalError('premium_upgrade_request', error);
+        event.currentTarget.disabled = false;
+        showAlert('Error', 'No se pudo registrar la solicitud.', 'error');
+        return;
+    }
+
+    if (data?.status === 'already_premium') {
+        await loadPlanState();
+    }
+
+    trackAnalyticsEvent('premium_upgrade_requested', {
+        request_status: data?.status || 'pending'
+    });
+    showAlert('Solicitud registrada', 'No se realizó ningún cobro.', 'success');
+    await loadPremiumRequestStatus();
 });
 
 function normalizarListaPreferencias(value) {
