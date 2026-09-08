@@ -229,6 +229,7 @@ function aplicarEstadoPlan(planData) {
     const premiumMessage = document.getElementById('premium-preferences-message');
     const weeklyPlanLocked = document.getElementById('weekly-plan-locked');
     const weeklyPlanContent = document.getElementById('weekly-plan-content');
+    const savedPremiumTools = document.getElementById('saved-premium-tools');
 
     if (badge) {
         badge.textContent = isPremium ? 'Premium' : 'Free';
@@ -249,6 +250,7 @@ function aplicarEstadoPlan(planData) {
     if (premiumMessage) premiumMessage.classList.toggle('visible', !isPremium);
     if (weeklyPlanLocked) weeklyPlanLocked.classList.toggle('hidden', isPremium);
     if (weeklyPlanContent) weeklyPlanContent.classList.toggle('hidden', !isPremium);
+    if (savedPremiumTools) savedPremiumTools.classList.toggle('hidden', !isPremium);
 
 }
 
@@ -495,7 +497,7 @@ function renderIngredientesEstructurados(requiredIngredients) {
                     const isMissing = item.availability === 'missing';
                     return `
                         <li class="recipe-ingredient ${isMissing ? 'recipe-ingredient--missing' : ''}">
-                            <span>${formatearCantidad(item.quantity)} ${item.unit} · ${item.name}</span>
+                            <span>${formatearCantidad(item.quantity)} ${escaparHTML(item.unit)} · ${escaparHTML(item.name)}</span>
                             <span class="recipe-ingredient-status">${isMissing ? 'Comprar' : 'Disponible'}</span>
                         </li>
                     `;
@@ -507,7 +509,7 @@ function renderIngredientesEstructurados(requiredIngredients) {
 
 function renderRecipeTags(tags) {
     if (!Array.isArray(tags) || tags.length === 0) return '';
-    return `<div class="recipe-tags">${tags.map(tag => `<span>${tag}</span>`).join('')}</div>`;
+    return `<div class="recipe-tags">${tags.map(tag => `<span>${escaparHTML(tag)}</span>`).join('')}</div>`;
 }
 
 async function ejecutarGeneracion() {
@@ -1678,52 +1680,284 @@ document.getElementById('share-shopping-list-btn').addEventListener('click', () 
     trackAnalyticsEvent('shopping_list_shared', { pending_item_count: pending.length });
 });
 
+const savedLibraryState = {
+    recipes: [],
+    history: [],
+    view: 'favorites',
+    search: '',
+    sort: 'recent'
+};
+
+function formatearFechaHistorial(value) {
+    if (!value) return 'Fecha no disponible';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
+    return new Intl.DateTimeFormat('es-AR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    }).format(date);
+}
+
+function obtenerRecetasFiltradas() {
+    const query = normalizarClaveCompra(savedLibraryState.search);
+    const filtered = savedLibraryState.recipes.filter(recipe => {
+        if (!query) return true;
+        const searchable = normalizarClaveCompra([
+            recipe.title,
+            recipe.difficulty,
+            ...(Array.isArray(recipe.tags) ? recipe.tags : [])
+        ].join(' '));
+        return searchable.includes(query);
+    });
+
+    return filtered.sort((a, b) => {
+        if (savedLibraryState.sort === 'title') {
+            return String(a.title || '').localeCompare(String(b.title || ''), 'es');
+        }
+        if (savedLibraryState.sort === 'most_cooked') {
+            return (Number(b.total_cooked) || 0) - (Number(a.total_cooked) || 0);
+        }
+        if (savedLibraryState.sort === 'pinned') {
+            return Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned))
+                || String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        }
+        return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
+}
+
+function renderSavedRecipesLibrary() {
+    const container = document.getElementById('saved-recipes-list');
+    const historyContainer = document.getElementById('cooking-history-list');
+    const controls = document.getElementById('saved-library-controls');
+    const countBadge = document.getElementById('saved-recipes-count');
+    const isPremium = currentPlanState.plan === 'premium';
+    const recipes = obtenerRecetasFiltradas();
+
+    countBadge.textContent = `${savedLibraryState.recipes.length} ${savedLibraryState.recipes.length === 1 ? 'receta' : 'recetas'}`;
+    const showHistory = isPremium && savedLibraryState.view === 'history';
+    container.classList.toggle('hidden', showHistory);
+    historyContainer.classList.toggle('hidden', !showHistory);
+    controls?.classList.toggle('hidden', showHistory);
+
+    document.querySelectorAll('.saved-library-tab').forEach(button => {
+        button.classList.toggle('active', button.dataset.libraryView === savedLibraryState.view);
+    });
+
+    if (showHistory) {
+        if (savedLibraryState.history.length === 0) {
+            historyContainer.innerHTML = '<p class="empty-state">Todavía no hay comidas registradas en el historial.</p>';
+            return;
+        }
+
+        historyContainer.innerHTML = savedLibraryState.history.map(entry => `
+            <article class="cooking-history-item">
+                <span class="cooking-history-icon">✓</span>
+                <div>
+                    <strong>${escaparHTML(entry.title || 'Receta eliminada')}</strong>
+                    <small>${formatearFechaHistorial(entry.cooked_at)}</small>
+                </div>
+                <span class="cooking-history-source">${entry.source === 'weekly_plan' ? 'Plan' : 'Favoritas'}</span>
+            </article>
+        `).join('');
+        return;
+    }
+
+    if (recipes.length === 0) {
+        container.innerHTML = savedLibraryState.search
+            ? '<p class="empty-state">No encontramos recetas con esa búsqueda.</p>'
+            : '<p class="empty-state">Aún no guardaste ninguna receta.</p>';
+        return;
+    }
+
+    container.innerHTML = recipes.map(recipe => {
+        const structuredIngredients = renderIngredientesEstructurados(recipe.required_ingredients);
+        const tagsHTML = renderRecipeTags(recipe.tags);
+        const rawSteps = Array.isArray(recipe.steps) ? recipe.steps : [];
+        const cookingSteps = rawSteps.flatMap(step => parsearPasos(step)).filter(Boolean);
+        const encodedTitle = encodeURIComponent(recipe.title || 'Receta');
+        const encodedSteps = encodeURIComponent(JSON.stringify(cookingSteps));
+        const recipeId = escaparHTML(recipe.id);
+        const createdLabel = recipe.created_at
+            ? `Guardada ${new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(recipe.created_at))}`
+            : '';
+
+        return `
+            <article class="recipe-card-container saved-library-card ${recipe.is_pinned ? 'is-pinned' : ''}" data-saved-recipe-id="${recipeId}">
+                <div class="saved-card-actions">
+                    ${isPremium ? `
+                        <button type="button" onclick="togglePinnedRecipe('${recipeId}', ${!recipe.is_pinned})" class="recipe-action-btn saved-pin-btn ${recipe.is_pinned ? 'active' : ''}" title="${recipe.is_pinned ? 'Desfijar' : 'Fijar'} receta">
+                            ${recipe.is_pinned ? '★' : '☆'}
+                        </button>
+                    ` : ''}
+                    <button type="button" onclick="deleteRecipe('${recipeId}', event)" class="recipe-action-btn btn-delete" title="Eliminar receta">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </div>
+                <div>
+                    <h3 class="recipe-card-title">${escaparHTML(recipe.title)}</h3>
+                    ${createdLabel ? `<small class="saved-created-label">${createdLabel}</small>` : ''}
+                </div>
+                <div class="saved-recipe-meta">
+                    <span>${escaparHTML(recipe.duration_minutes ? `${recipe.duration_minutes} min` : recipe.time)} · ${escaparHTML(recipe.difficulty)} · ${Number(recipe.servings) || 2} porciones</span>
+                    <span class="cooked-badge">🍳 Cocinada: <strong>${Number(recipe.total_cooked) || 0}</strong> veces</span>
+                </div>
+                ${tagsHTML}
+                ${structuredIngredients}
+                <p class="recipe-instructions recipe-instructions--italic">
+                    ${cookingSteps.length > 0 ? escaparHTML(cookingSteps.join(' ')) : 'Sin pasos guardados'}
+                </p>
+                ${isPremium ? `
+                    <div class="saved-personal-details">
+                        <label>
+                            <span>Tu valoración</span>
+                            <select onchange="updateSavedRecipeRating('${recipeId}', this.value)">
+                                <option value="">Sin valorar</option>
+                                ${[1, 2, 3, 4, 5].map(value => `<option value="${value}" ${Number(recipe.rating) === value ? 'selected' : ''}>${'★'.repeat(value)}</option>`).join('')}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Nota privada</span>
+                            <textarea maxlength="500" rows="2" placeholder="Ej. usar menos sal la próxima vez…">${escaparHTML(recipe.personal_note || '')}</textarea>
+                        </label>
+                        <button type="button" onclick="saveRecipeNote('${recipeId}', this.previousElementSibling.querySelector('textarea').value)">Guardar nota</button>
+                    </div>
+                ` : ''}
+                <div class="saved-card-main-actions">
+                    <button type="button" class="btn-abrir-cocina" data-title="${encodedTitle}" data-steps="${encodedSteps}">👨‍🍳 Abrir Modo Cocina</button>
+                    <button type="button" onclick="marcarCocinada('${recipeId}')" class="btn-cook-today">✨ ¡Cocinada hoy!</button>
+                </div>
+            </article>
+        `;
+    }).join('');
+    lucide.createIcons();
+}
+
 async function loadSavedRecipes() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    
-    const { data, error } = await supabase.from('saved_recipes').select('*').eq('user_id', user.id);
-    const container = document.getElementById('saved-recipes-list');
+
+    const { data, error } = await supabase
+        .from('saved_recipes')
+        .select('*')
+        .eq('user_id', user.id);
 
     if (error) {
         trackTechnicalError('saved_recipes_load', error);
+        showAlert('Error', 'No se pudieron cargar tus recetas guardadas.', 'error');
+        return;
     }
-    
-    if (data && data.length > 0) {
-        container.innerHTML = data.map(recipe => {
-            const structuredIngredients = renderIngredientesEstructurados(recipe.required_ingredients);
-            const tagsHTML = renderRecipeTags(recipe.tags);
 
-            return `
-                <div class="recipe-card-container">
-                    <button onclick="deleteRecipe('${recipe.id}', event)" class="recipe-action-btn btn-delete" title="Eliminar receta">
-                        <i data-lucide="trash-2"></i>
-                    </button>
-                    <div>
-                        <h3 class="recipe-card-title">${recipe.title}</h3>
-                    </div>
-                    <div class="saved-recipe-meta">
-                        <span>${recipe.duration_minutes ? `${recipe.duration_minutes} min` : recipe.time} · ${recipe.difficulty} · ${recipe.servings || 2} porciones</span>
-                        <span class="cooked-badge">
-                            🍳 Cocinada: <strong>${recipe.times_cooked || 0}</strong> veces
-                        </span>
-                    </div>
-                    ${tagsHTML}
-                    ${structuredIngredients}
-                    <p class="recipe-instructions recipe-instructions--italic">
-                        ${recipe.steps ? recipe.steps.join(' ') : 'Sin pasos guardados'}
-                    </p>
-                    <button onclick="marcarCocinada('${recipe.id}', ${recipe.times_cooked || 0})" class="btn-cook-today">
-                        ✨ ¡Cocinada hoy! (Sumar al historial)
-                    </button>
-                </div>
-            `;
-        }).join('');
-        lucide.createIcons();
-    } else {
-        container.innerHTML = '<p class="empty-state">Aún no guardaste ninguna receta.</p>';
+    let manualHistory = [];
+    let weeklyHistory = [];
+    const weeklyCounts = new Map();
+
+    if (currentPlanState.plan === 'premium') {
+        const [manualResult, weeklyResult] = await Promise.all([
+            supabase.from('recipe_cooking_history').select('*').eq('user_id', user.id).order('cooked_at', { ascending: false }),
+            supabase.from('weekly_plan_meals').select('saved_recipe_id,recipe_snapshot,cooked_at').eq('user_id', user.id).eq('is_cooked', true)
+        ]);
+
+        if (manualResult.error || weeklyResult.error) {
+            trackTechnicalError('expanded_history_load', manualResult.error || weeklyResult.error);
+        } else {
+            manualHistory = (manualResult.data || []).map(item => ({
+                title: item.recipe_title,
+                cooked_at: item.cooked_at,
+                source: item.source
+            }));
+            weeklyHistory = (weeklyResult.data || []).map(item => {
+                const recipeId = String(item.saved_recipe_id || '');
+                if (recipeId) weeklyCounts.set(recipeId, (weeklyCounts.get(recipeId) || 0) + 1);
+                return {
+                    title: item.recipe_snapshot?.title,
+                    cooked_at: item.cooked_at,
+                    source: 'weekly_plan'
+                };
+            });
+        }
     }
+
+    savedLibraryState.recipes = (data || []).map(recipe => ({
+        ...recipe,
+        total_cooked: (Number(recipe.times_cooked) || 0) + (weeklyCounts.get(String(recipe.id)) || 0)
+    }));
+    savedLibraryState.history = [...manualHistory, ...weeklyHistory]
+        .filter(item => item.cooked_at)
+        .sort((a, b) => String(b.cooked_at).localeCompare(String(a.cooked_at)));
+    renderSavedRecipesLibrary();
 }
+
+document.querySelectorAll('.saved-library-tab').forEach(button => {
+    button.addEventListener('click', () => {
+        savedLibraryState.view = button.dataset.libraryView;
+        if (savedLibraryState.view === 'history') {
+            trackAnalyticsEvent('screen_view', { screen: 'cooking_history' });
+        }
+        renderSavedRecipesLibrary();
+    });
+});
+
+document.getElementById('saved-recipe-search').addEventListener('input', event => {
+    savedLibraryState.search = event.target.value;
+    renderSavedRecipesLibrary();
+});
+
+document.getElementById('saved-recipe-sort').addEventListener('change', event => {
+    savedLibraryState.sort = event.target.value;
+    trackAnalyticsEvent('saved_recipes_sorted', { sort: event.target.value });
+    renderSavedRecipesLibrary();
+});
+
+window.togglePinnedRecipe = async function(recipeId, isPinned) {
+    if (currentPlanState.plan !== 'premium') return;
+    const { error } = await supabase
+        .from('saved_recipes')
+        .update({ is_pinned: Boolean(isPinned), updated_at: new Date().toISOString() })
+        .eq('id', recipeId);
+
+    if (error) {
+        trackTechnicalError('saved_recipe_pin', error);
+        showAlert('Error', 'No se pudo actualizar la receta fijada.', 'error');
+        return;
+    }
+    trackAnalyticsEvent('saved_recipe_pinned', { pinned: Boolean(isPinned) });
+    await loadSavedRecipes();
+};
+
+window.updateSavedRecipeRating = async function(recipeId, value) {
+    if (currentPlanState.plan !== 'premium') return;
+    const rating = value === '' ? null : Number(value);
+    const { error } = await supabase
+        .from('saved_recipes')
+        .update({ rating, updated_at: new Date().toISOString() })
+        .eq('id', recipeId);
+
+    if (error) {
+        trackTechnicalError('saved_recipe_rating', error);
+        showAlert('Error', 'No se pudo guardar la valoración.', 'error');
+        return;
+    }
+    trackAnalyticsEvent('saved_recipe_rated', { has_rating: rating !== null });
+};
+
+window.saveRecipeNote = async function(recipeId, note) {
+    if (currentPlanState.plan !== 'premium') return;
+    const { error } = await supabase
+        .from('saved_recipes')
+        .update({ personal_note: String(note || '').trim().slice(0, 500) || null, updated_at: new Date().toISOString() })
+        .eq('id', recipeId);
+
+    if (error) {
+        trackTechnicalError('saved_recipe_note', error);
+        showAlert('Error', 'No se pudo guardar la nota.', 'error');
+        return;
+    }
+    trackAnalyticsEvent('saved_recipe_note_updated', { has_note: Boolean(String(note || '').trim()) });
+    showAlert('Nota guardada', 'Tu nota privada quedó actualizada.', 'success');
+};
 
 window.deleteRecipe = async function(id, event) {
     if (event) {
@@ -1755,14 +1989,17 @@ window.enviarPorWhatsApp = function(recipeTitle, missingArray) {
     window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank');
 }
 
-window.marcarCocinada = async function(recipeId, currentCount) {
-    const nuevoTotal = (currentCount || 0) + 1;
-    const { error } = await supabase.from('saved_recipes').update({ times_cooked: nuevoTotal }).eq('id', recipeId);
+window.marcarCocinada = async function(recipeId) {
+    const { data, error } = await supabase.rpc('record_recipe_cooked', {
+        p_recipe_id: String(recipeId),
+        p_source: 'favorites'
+    });
 
     if (error) {
         trackTechnicalError('recipe_mark_cooked', error);
         showAlert('Error', 'No se pudo registrar la cocinada.', 'error');
     } else {
+        const nuevoTotal = Number(data?.times_cooked) || 1;
         trackAnalyticsEvent('recipe_marked_cooked', {
             recipe_id: await crearHuellaPrivada(recipeId),
             cooked_count: nuevoTotal

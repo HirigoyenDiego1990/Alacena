@@ -108,9 +108,33 @@
 
             <!-- Sub-vista: Recetas Guardadas -->
             <div id="view-saved" class="sub-view hidden">
-                <h2 class="section-title">Mis Favoritas</h2>
-                <p class="section-sub">Tus recetas guardadas para cocinar cuando quieras.</p>
+                <div class="saved-library-heading">
+                    <div>
+                        <h2 class="section-title">Mis Favoritas</h2>
+                        <p class="section-sub">Tus recetas guardadas para cocinar cuando quieras.</p>
+                    </div>
+                    <span id="saved-recipes-count" class="saved-recipes-count">0 recetas</span>
+                </div>
+
+                <div id="saved-premium-tools" class="saved-premium-tools hidden">
+                    <div class="saved-library-tabs">
+                        <button type="button" class="saved-library-tab active" data-library-view="favorites">Favoritas</button>
+                        <button type="button" class="saved-library-tab" data-library-view="history">Historial</button>
+                    </div>
+
+                    <div id="saved-library-controls" class="saved-library-controls">
+                        <input type="search" id="saved-recipe-search" placeholder="Buscar receta, etiqueta…" aria-label="Buscar recetas guardadas">
+                        <select id="saved-recipe-sort" aria-label="Ordenar recetas">
+                            <option value="recent">Más recientes</option>
+                            <option value="title">Nombre</option>
+                            <option value="most_cooked">Más cocinadas</option>
+                            <option value="pinned">Fijadas primero</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div id="saved-recipes-list" class="recipe-list"></div>
+                <div id="cooking-history-list" class="cooking-history-list hidden"></div>
             </div>
 
             <!-- Sub-vista: Planificación semanal Premium -->

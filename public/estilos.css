@@ -1021,6 +1021,265 @@ button[type="submit"]:hover {
 }
 
 /* ============================================
+   BIBLIOTECA E HISTORIAL PREMIUM
+   ============================================ */
+
+.saved-library-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.saved-recipes-count {
+  flex-shrink: 0;
+  margin-top: 3px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: rgba(251, 246, 236, 0.07);
+  color: rgba(243, 239, 226, 0.58);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+}
+
+.saved-premium-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 2px 0 16px;
+}
+
+.saved-library-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border-radius: 11px;
+  background: rgba(251, 246, 236, 0.045);
+}
+
+.saved-library-tab {
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(243, 239, 226, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.saved-library-tab.active {
+  background: rgba(232, 163, 61, 0.13);
+  color: var(--saffron);
+}
+
+.saved-library-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 135px;
+  gap: 7px;
+}
+
+.saved-library-controls input,
+.saved-library-controls select {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 9px;
+  outline: none;
+  background: rgba(251, 246, 236, 0.05);
+  color: var(--cream-text);
+  font-size: 10px;
+}
+
+.saved-library-controls select option,
+.saved-personal-details select option {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.saved-library-card.is-pinned {
+  border-color: rgba(232, 163, 61, 0.35);
+  background: rgba(232, 163, 61, 0.045);
+}
+
+.saved-card-actions {
+  position: absolute;
+  z-index: 10;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 6px;
+}
+
+.saved-card-actions .recipe-action-btn {
+  position: static;
+  width: 34px;
+  height: 34px;
+}
+
+.saved-pin-btn {
+  font-size: 18px;
+}
+
+.saved-pin-btn.active {
+  border-color: rgba(232, 163, 61, 0.5);
+  background: rgba(232, 163, 61, 0.14);
+  color: var(--saffron);
+}
+
+.saved-library-card .recipe-card-title {
+  padding-right: 86px;
+}
+
+.saved-created-label {
+  display: block;
+  margin-top: -4px;
+  color: rgba(243, 239, 226, 0.36);
+  font-size: 8.5px;
+}
+
+.saved-personal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(232, 163, 61, 0.15);
+  border-radius: 11px;
+  background: rgba(232, 163, 61, 0.045);
+}
+
+.saved-personal-details label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: rgba(243, 239, 226, 0.48);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.saved-personal-details select,
+.saved-personal-details textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.48);
+  color: var(--cream-text);
+  font: inherit;
+  font-size: 10px;
+}
+
+.saved-personal-details textarea {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.saved-personal-details button {
+  align-self: flex-end;
+  padding: 7px 10px;
+  border: 1px solid rgba(232, 163, 61, 0.25);
+  border-radius: 7px;
+  background: rgba(232, 163, 61, 0.08);
+  color: var(--saffron);
+  font-size: 8.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.saved-card-main-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.saved-card-main-actions .btn-abrir-cocina,
+.saved-card-main-actions .btn-cook-today {
+  width: 100%;
+  margin: 0;
+  padding: 11px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.saved-card-main-actions .btn-abrir-cocina {
+  border: 1px solid rgba(124, 148, 115, 0.32);
+  background: rgba(124, 148, 115, 0.11);
+  color: #b8cfaf;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cooking-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cooking-history-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  border: 1px solid rgba(251, 246, 236, 0.08);
+  border-radius: 11px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.cooking-history-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(124, 148, 115, 0.15);
+  color: #b8cfaf;
+  font-size: 13px;
+  line-height: 28px;
+  text-align: center;
+}
+
+.cooking-history-item div {
+  min-width: 0;
+}
+
+.cooking-history-item strong,
+.cooking-history-item small {
+  display: block;
+}
+
+.cooking-history-item strong {
+  overflow: hidden;
+  color: var(--cream-text);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cooking-history-item small {
+  margin-top: 3px;
+  color: rgba(243, 239, 226, 0.4);
+  font-size: 8.5px;
+}
+
+.cooking-history-source {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(232, 163, 61, 0.1);
+  color: var(--saffron);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 430px) {
+  .saved-library-controls,
+  .saved-card-main-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
    PLANIFICACIÓN SEMANAL
    ============================================ */
 
