@@ -128,6 +128,17 @@
                             <option value="pinned">Fijadas primero</option>
                         </select>
                     </div>
+
+                    <div id="saved-collection-tools" class="saved-collection-tools">
+                        <select id="saved-collection-filter" aria-label="Filtrar por colección">
+                            <option value="all">Todas las colecciones</option>
+                        </select>
+                        <form id="create-collection-form" class="create-collection-form">
+                            <input type="text" id="new-collection-name" maxlength="40" placeholder="Nueva colección…" aria-label="Nombre de la colección">
+                            <button type="submit">Crear</button>
+                        </form>
+                        <div id="saved-collection-list" class="saved-collection-list"></div>
+                    </div>
                 </div>
 
                 <div id="saved-recipes-list" class="recipe-list"></div>
@@ -154,6 +165,13 @@
                         </div>
                         <button type="button" id="next-week-btn" class="week-nav-btn" aria-label="Semana siguiente">›</button>
                     </div>
+
+                    <label class="weekly-collection-filter">
+                        <span>Recetas disponibles</span>
+                        <select id="weekly-collection-filter">
+                            <option value="all">Todas mis favoritas</option>
+                        </select>
+                    </label>
 
                     <div class="weekly-plan-actions">
                         <button type="button" id="autofill-week-btn" class="weekly-secondary-btn">✨ Completar espacios</button>

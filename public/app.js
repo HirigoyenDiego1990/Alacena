@@ -922,6 +922,9 @@ const weeklyPlanState = {
     planId: null,
     userId: null,
     recipes: [],
+    collections: [],
+    collectionItems: [],
+    collectionFilter: 'all',
     meals: new Map(),
     defaultServings: 2,
     movingKey: null,
@@ -991,11 +994,26 @@ function crearRecipeSnapshot(recipe) {
     };
 }
 
+function obtenerWeeklyRecipesDisponibles() {
+    if (weeklyPlanState.collectionFilter === 'all') return weeklyPlanState.recipes;
+    const allowedRecipeIds = new Set(
+        weeklyPlanState.collectionItems
+            .filter(item => item.collection_id === weeklyPlanState.collectionFilter)
+            .map(item => String(item.saved_recipe_id))
+    );
+    return weeklyPlanState.recipes.filter(recipe => allowedRecipeIds.has(String(recipe.id)));
+}
+
 function renderWeeklyMealSlot(date, mealType, label) {
     const key = crearMealKey(date, mealType);
     const meal = weeklyPlanState.meals.get(key);
     const recipeId = meal?.saved_recipe_id || '';
-    const options = weeklyPlanState.recipes.map(recipe => `
+    const filteredRecipes = obtenerWeeklyRecipesDisponibles();
+    const selectedRecipe = weeklyPlanState.recipes.find(recipe => String(recipe.id) === String(recipeId));
+    const selectableRecipes = selectedRecipe && !filteredRecipes.some(recipe => String(recipe.id) === String(recipeId))
+        ? [selectedRecipe, ...filteredRecipes]
+        : filteredRecipes;
+    const options = selectableRecipes.map(recipe => `
         <option value="${escaparHTML(recipe.id)}" ${String(recipe.id) === String(recipeId) ? 'selected' : ''}>
             ${escaparHTML(recipe.title)}
         </option>
@@ -1035,6 +1053,19 @@ function renderWeeklyPlan() {
     const weekEnd = sumarDias(weeklyPlanState.weekStart, 6);
     const formatter = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' });
     range.textContent = `${formatter.format(weeklyPlanState.weekStart)} – ${formatter.format(weekEnd)}`;
+    const collectionFilter = document.getElementById('weekly-collection-filter');
+    if (collectionFilter) {
+        collectionFilter.innerHTML = `
+            <option value="all">Todas mis favoritas</option>
+            ${weeklyPlanState.collections.map(collection => `
+                <option value="${escaparHTML(collection.id)}">${escaparHTML(collection.name)}</option>
+            `).join('')}
+        `;
+        if (!weeklyPlanState.collections.some(item => item.id === weeklyPlanState.collectionFilter)) {
+            weeklyPlanState.collectionFilter = 'all';
+        }
+        collectionFilter.value = weeklyPlanState.collectionFilter;
+    }
 
     grid.innerHTML = Array.from({ length: 7 }, (_, dayIndex) => {
         const dateObject = sumarDias(weeklyPlanState.weekStart, dayIndex);
@@ -1070,13 +1101,15 @@ async function loadWeeklyPlan() {
     if (!user || loadVersion !== weeklyPlanState.loadVersion) return;
 
     const weekStart = fechaLocalISO(weeklyPlanState.weekStart);
-    const [recipesResult, preferencesResult] = await Promise.all([
+    const [recipesResult, preferencesResult, collectionsResult, collectionItemsResult] = await Promise.all([
         supabase.from('saved_recipes').select('*').eq('user_id', user.id).order('title'),
-        supabase.rpc('get_my_recipe_preferences')
+        supabase.rpc('get_my_recipe_preferences'),
+        supabase.from('recipe_collections').select('*').eq('user_id', user.id).order('name'),
+        supabase.from('recipe_collection_items').select('*').eq('user_id', user.id)
     ]);
 
-    if (recipesResult.error || preferencesResult.error) {
-        trackTechnicalError('weekly_plan_dependencies_load', recipesResult.error || preferencesResult.error);
+    if (recipesResult.error || preferencesResult.error || collectionsResult.error || collectionItemsResult.error) {
+        trackTechnicalError('weekly_plan_dependencies_load', recipesResult.error || preferencesResult.error || collectionsResult.error || collectionItemsResult.error);
         showAlert('Error', 'No se pudo preparar el plan semanal.', 'error');
         return;
     }
@@ -1109,6 +1142,8 @@ async function loadWeeklyPlan() {
     weeklyPlanState.planId = plan.id;
     weeklyPlanState.userId = user.id;
     weeklyPlanState.recipes = recipesResult.data || [];
+    weeklyPlanState.collections = collectionsResult.data || [];
+    weeklyPlanState.collectionItems = collectionItemsResult.data || [];
     weeklyPlanState.defaultServings = Number(preferencesResult.data?.default_servings) || 2;
     weeklyPlanState.meals = new Map((meals || []).map(meal => [
         crearMealKey(meal.meal_date, meal.meal_type),
@@ -1259,9 +1294,21 @@ document.getElementById('weekly-plan-grid').addEventListener('click', async even
     }
 });
 
+document.getElementById('weekly-collection-filter').addEventListener('change', event => {
+    weeklyPlanState.collectionFilter = event.target.value;
+    trackAnalyticsEvent('weekly_plan_collection_filtered', {
+        filtered: event.target.value !== 'all'
+    });
+    renderWeeklyPlan();
+});
+
 document.getElementById('autofill-week-btn').addEventListener('click', async () => {
-    if (weeklyPlanState.recipes.length === 0) {
-        showAlert('Faltan favoritas', 'Guardá al menos una receta antes de completar la semana.', 'warning');
+    const availableRecipes = obtenerWeeklyRecipesDisponibles();
+    if (availableRecipes.length === 0) {
+        const message = weeklyPlanState.collectionFilter === 'all'
+            ? 'Guardá al menos una receta antes de completar la semana.'
+            : 'La colección elegida todavía no tiene recetas.';
+        showAlert('Faltan favoritas', message, 'warning');
         return;
     }
 
@@ -1277,7 +1324,7 @@ document.getElementById('autofill-week-btn').addEventListener('click', async () 
 
     try {
         const payloads = emptySlots.map((slot, index) => {
-            const recipe = weeklyPlanState.recipes[index % weeklyPlanState.recipes.length];
+            const recipe = availableRecipes[index % availableRecipes.length];
             return {
                 plan_id: weeklyPlanState.planId,
                 user_id: weeklyPlanState.userId,
@@ -1805,6 +1852,9 @@ document.getElementById('share-shopping-list-btn').addEventListener('click', () 
 const savedLibraryState = {
     recipes: [],
     history: [],
+    collections: [],
+    collectionItems: [],
+    collectionFilter: 'all',
     view: 'favorites',
     search: '',
     sort: 'recent'
@@ -1823,9 +1873,48 @@ function formatearFechaHistorial(value) {
     }).format(date);
 }
 
+function renderSavedCollectionTools() {
+    const filter = document.getElementById('saved-collection-filter');
+    const list = document.getElementById('saved-collection-list');
+    if (!filter || !list) return;
+
+    filter.innerHTML = `
+        <option value="all">Todas las colecciones</option>
+        ${savedLibraryState.collections.map(collection => `
+            <option value="${escaparHTML(collection.id)}">${escaparHTML(collection.name)}</option>
+        `).join('')}
+    `;
+    filter.value = savedLibraryState.collections.some(item => item.id === savedLibraryState.collectionFilter)
+        ? savedLibraryState.collectionFilter
+        : 'all';
+    savedLibraryState.collectionFilter = filter.value;
+
+    if (savedLibraryState.collections.length === 0) {
+        list.innerHTML = '<span class="collection-list-empty">Creá tu primera colección para organizar recetas.</span>';
+        return;
+    }
+
+    list.innerHTML = savedLibraryState.collections.map(collection => {
+        const recipeCount = savedLibraryState.collectionItems.filter(item => item.collection_id === collection.id).length;
+        return `
+            <span class="saved-collection-pill">
+                ${escaparHTML(collection.name)} <small>${recipeCount}</small>
+                <button type="button" onclick="deleteRecipeCollection('${escaparHTML(collection.id)}')" aria-label="Eliminar colección">×</button>
+            </span>
+        `;
+    }).join('');
+}
+
 function obtenerRecetasFiltradas() {
     const query = normalizarClaveCompra(savedLibraryState.search);
     const filtered = savedLibraryState.recipes.filter(recipe => {
+        if (
+            savedLibraryState.collectionFilter !== 'all'
+            && !savedLibraryState.collectionItems.some(item =>
+                item.collection_id === savedLibraryState.collectionFilter
+                && String(item.saved_recipe_id) === String(recipe.id)
+            )
+        ) return false;
         if (!query) return true;
         const searchable = normalizarClaveCompra([
             recipe.title,
@@ -1854,15 +1943,18 @@ function renderSavedRecipesLibrary() {
     const container = document.getElementById('saved-recipes-list');
     const historyContainer = document.getElementById('cooking-history-list');
     const controls = document.getElementById('saved-library-controls');
+    const collectionTools = document.getElementById('saved-collection-tools');
     const countBadge = document.getElementById('saved-recipes-count');
     const isPremium = currentPlanState.plan === 'premium';
-    const recipes = obtenerRecetasFiltradas();
 
     countBadge.textContent = `${savedLibraryState.recipes.length} ${savedLibraryState.recipes.length === 1 ? 'receta' : 'recetas'}`;
     const showHistory = isPremium && savedLibraryState.view === 'history';
     container.classList.toggle('hidden', showHistory);
     historyContainer.classList.toggle('hidden', !showHistory);
     controls?.classList.toggle('hidden', showHistory);
+    collectionTools?.classList.toggle('hidden', showHistory);
+    if (isPremium) renderSavedCollectionTools();
+    const recipes = obtenerRecetasFiltradas();
 
     document.querySelectorAll('.saved-library-tab').forEach(button => {
         button.classList.toggle('active', button.dataset.libraryView === savedLibraryState.view);
@@ -1888,8 +1980,8 @@ function renderSavedRecipesLibrary() {
     }
 
     if (recipes.length === 0) {
-        container.innerHTML = savedLibraryState.search
-            ? '<p class="empty-state">No encontramos recetas con esa búsqueda.</p>'
+        container.innerHTML = savedLibraryState.search || savedLibraryState.collectionFilter !== 'all'
+            ? '<p class="empty-state">No hay recetas que coincidan con este filtro.</p>'
             : '<p class="empty-state">Aún no guardaste ninguna receta.</p>';
         return;
     }
@@ -1902,6 +1994,13 @@ function renderSavedRecipesLibrary() {
         const encodedTitle = encodeURIComponent(recipe.title || 'Receta');
         const encodedSteps = encodeURIComponent(JSON.stringify(cookingSteps));
         const recipeId = escaparHTML(recipe.id);
+        const recipeCollections = savedLibraryState.collectionItems
+            .filter(item => String(item.saved_recipe_id) === String(recipe.id))
+            .map(item => savedLibraryState.collections.find(collection => collection.id === item.collection_id))
+            .filter(Boolean);
+        const availableCollections = savedLibraryState.collections.filter(collection =>
+            !recipeCollections.some(current => current.id === collection.id)
+        );
         const createdLabel = recipe.created_at
             ? `Guardada ${new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(recipe.created_at))}`
             : '';
@@ -1927,6 +2026,23 @@ function renderSavedRecipesLibrary() {
                     <span class="cooked-badge">🍳 Cocinada: <strong>${Number(recipe.total_cooked) || 0}</strong> veces</span>
                 </div>
                 ${tagsHTML}
+                ${isPremium ? `
+                    <div class="recipe-collections-block">
+                        <div class="recipe-collection-memberships">
+                            ${recipeCollections.length > 0
+                                ? recipeCollections.map(collection => `
+                                    <span>${escaparHTML(collection.name)}
+                                        <button type="button" onclick="removeRecipeFromCollection('${recipeId}', '${escaparHTML(collection.id)}')" aria-label="Quitar de la colección">×</button>
+                                    </span>
+                                `).join('')
+                                : '<small>Sin colección</small>'}
+                        </div>
+                        <select onchange="addRecipeToCollection('${recipeId}', this.value); this.value = ''" ${availableCollections.length === 0 ? 'disabled' : ''}>
+                            <option value="">${savedLibraryState.collections.length === 0 ? 'Primero creá una colección' : 'Agregar a colección…'}</option>
+                            ${availableCollections.map(collection => `<option value="${escaparHTML(collection.id)}">${escaparHTML(collection.name)}</option>`).join('')}
+                        </select>
+                    </div>
+                ` : ''}
                 ${structuredIngredients}
                 <p class="recipe-instructions recipe-instructions--italic">
                     ${cookingSteps.length > 0 ? escaparHTML(cookingSteps.join(' ')) : 'Sin pasos guardados'}
@@ -1975,11 +2091,15 @@ async function loadSavedRecipes() {
     let manualHistory = [];
     let weeklyHistory = [];
     const weeklyCounts = new Map();
+    savedLibraryState.collections = [];
+    savedLibraryState.collectionItems = [];
 
     if (currentPlanState.plan === 'premium') {
-        const [manualResult, weeklyResult] = await Promise.all([
+        const [manualResult, weeklyResult, collectionsResult, collectionItemsResult] = await Promise.all([
             supabase.from('recipe_cooking_history').select('*').eq('user_id', user.id).order('cooked_at', { ascending: false }),
-            supabase.from('weekly_plan_meals').select('saved_recipe_id,recipe_snapshot,cooked_at').eq('user_id', user.id).eq('is_cooked', true)
+            supabase.from('weekly_plan_meals').select('saved_recipe_id,recipe_snapshot,cooked_at').eq('user_id', user.id).eq('is_cooked', true),
+            supabase.from('recipe_collections').select('*').eq('user_id', user.id).order('name'),
+            supabase.from('recipe_collection_items').select('*').eq('user_id', user.id)
         ]);
 
         if (manualResult.error || weeklyResult.error) {
@@ -1999,6 +2119,13 @@ async function loadSavedRecipes() {
                     source: 'weekly_plan'
                 };
             });
+        }
+
+        if (collectionsResult.error || collectionItemsResult.error) {
+            trackTechnicalError('recipe_collections_load', collectionsResult.error || collectionItemsResult.error);
+        } else {
+            savedLibraryState.collections = collectionsResult.data || [];
+            savedLibraryState.collectionItems = collectionItemsResult.data || [];
         }
     }
 
@@ -2032,6 +2159,109 @@ document.getElementById('saved-recipe-sort').addEventListener('change', event =>
     trackAnalyticsEvent('saved_recipes_sorted', { sort: event.target.value });
     renderSavedRecipesLibrary();
 });
+
+document.getElementById('saved-collection-filter').addEventListener('change', event => {
+    savedLibraryState.collectionFilter = event.target.value;
+    trackAnalyticsEvent('recipe_collection_filtered', {
+        filtered: event.target.value !== 'all'
+    });
+    renderSavedRecipesLibrary();
+});
+
+document.getElementById('create-collection-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (currentPlanState.plan !== 'premium') return;
+
+    const input = document.getElementById('new-collection-name');
+    const name = input.value.trim().replace(/\s+/g, ' ');
+    if (!name) {
+        showAlert('Falta el nombre', 'Escribí un nombre para la colección.', 'warning');
+        return;
+    }
+    if (savedLibraryState.collections.length >= 30) {
+        showAlert('Límite alcanzado', 'Podés crear hasta 30 colecciones.', 'warning');
+        return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    const { error } = await supabase.from('recipe_collections').insert({
+        user_id: user.id,
+        name: name.slice(0, 40)
+    });
+    submitButton.disabled = false;
+
+    if (error) {
+        trackTechnicalError('recipe_collection_create', error);
+        const message = error.message?.includes('duplicate')
+            ? 'Ya existe una colección con ese nombre.'
+            : 'No se pudo crear la colección.';
+        showAlert('Error', message, 'error');
+        return;
+    }
+
+    input.value = '';
+    trackAnalyticsEvent('recipe_collection_created', {
+        collection_count: savedLibraryState.collections.length + 1
+    });
+    await loadSavedRecipes();
+});
+
+window.deleteRecipeCollection = async function(collectionId) {
+    if (currentPlanState.plan !== 'premium') return;
+    const collection = savedLibraryState.collections.find(item => item.id === collectionId);
+    if (!collection || !window.confirm(`¿Eliminar la colección “${collection.name}”? Las recetas no se borrarán.`)) return;
+
+    const { error } = await supabase.from('recipe_collections').delete().eq('id', collectionId);
+    if (error) {
+        trackTechnicalError('recipe_collection_delete', error);
+        showAlert('Error', 'No se pudo eliminar la colección.', 'error');
+        return;
+    }
+
+    if (savedLibraryState.collectionFilter === collectionId) savedLibraryState.collectionFilter = 'all';
+    trackAnalyticsEvent('recipe_collection_deleted');
+    await loadSavedRecipes();
+};
+
+window.addRecipeToCollection = async function(recipeId, collectionId) {
+    if (currentPlanState.plan !== 'premium' || !collectionId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('recipe_collection_items').insert({
+        collection_id: collectionId,
+        user_id: user.id,
+        saved_recipe_id: String(recipeId)
+    });
+    if (error) {
+        trackTechnicalError('recipe_collection_item_add', error);
+        showAlert('Error', 'No se pudo agregar la receta a la colección.', 'error');
+        return;
+    }
+
+    trackAnalyticsEvent('recipe_added_to_collection');
+    await loadSavedRecipes();
+};
+
+window.removeRecipeFromCollection = async function(recipeId, collectionId) {
+    if (currentPlanState.plan !== 'premium') return;
+    const { error } = await supabase
+        .from('recipe_collection_items')
+        .delete()
+        .eq('collection_id', collectionId)
+        .eq('saved_recipe_id', String(recipeId));
+    if (error) {
+        trackTechnicalError('recipe_collection_item_remove', error);
+        showAlert('Error', 'No se pudo quitar la receta de la colección.', 'error');
+        return;
+    }
+
+    trackAnalyticsEvent('recipe_removed_from_collection');
+    await loadSavedRecipes();
+};
 
 window.togglePinnedRecipe = async function(recipeId, isPinned) {
     if (currentPlanState.plan !== 'premium') return;

@@ -1151,6 +1151,100 @@ button[type="submit"]:hover {
   background: var(--paper);
 }
 
+.saved-collection-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid rgba(124, 148, 115, 0.18);
+  border-radius: 11px;
+  background: rgba(124, 148, 115, 0.055);
+}
+
+#saved-collection-filter,
+.create-collection-form input {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.5);
+  color: var(--cream-text);
+  font-size: 9.5px;
+}
+
+#saved-collection-filter option {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.create-collection-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+
+.create-collection-form button {
+  padding: 8px 10px;
+  border: 1px solid rgba(124, 148, 115, 0.3);
+  border-radius: 8px;
+  background: rgba(124, 148, 115, 0.13);
+  color: #b8cfaf;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.create-collection-form button:disabled {
+  opacity: 0.5;
+}
+
+.saved-collection-list {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 21px;
+}
+
+.collection-list-empty {
+  align-self: center;
+  color: rgba(243, 239, 226, 0.35);
+  font-size: 8.5px;
+}
+
+.saved-collection-pill,
+.recipe-collection-memberships span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(124, 148, 115, 0.14);
+  color: #b8cfaf;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.saved-collection-pill small {
+  color: rgba(184, 207, 175, 0.62);
+  font-size: 7px;
+}
+
+.saved-collection-pill button,
+.recipe-collection-memberships button {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(31, 42, 34, 0.36);
+  color: rgba(243, 239, 226, 0.55);
+  font-size: 11px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
 .saved-library-card.is-pinned {
   border-color: rgba(232, 163, 61, 0.35);
   background: rgba(232, 163, 61, 0.045);
@@ -1190,6 +1284,52 @@ button[type="submit"]:hover {
   margin-top: -4px;
   color: rgba(243, 239, 226, 0.36);
   font-size: 8.5px;
+}
+
+.recipe-collections-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(124, 148, 115, 0.14);
+  border-radius: 9px;
+  background: rgba(124, 148, 115, 0.045);
+}
+
+.recipe-collection-memberships {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recipe-collection-memberships > small {
+  align-self: center;
+  color: rgba(243, 239, 226, 0.34);
+  font-size: 8.5px;
+}
+
+.recipe-collections-block select {
+  flex: 0 1 135px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 7px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.5);
+  color: rgba(243, 239, 226, 0.65);
+  font-size: 8.5px;
+}
+
+.recipe-collections-block select:disabled {
+  opacity: 0.42;
+}
+
+.recipe-collections-block select option {
+  color: var(--ink);
+  background: var(--paper);
 }
 
 .saved-personal-details {
@@ -1331,6 +1471,23 @@ button[type="submit"]:hover {
   .saved-card-main-actions {
     grid-template-columns: 1fr;
   }
+
+  .saved-collection-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .saved-collection-list {
+    grid-column: auto;
+  }
+
+  .recipe-collections-block {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recipe-collections-block select {
+    flex-basis: auto;
+  }
 }
 
 /* ============================================
@@ -1405,6 +1562,37 @@ button[type="submit"]:hover {
   font-size: 25px;
   line-height: 1;
   cursor: pointer;
+}
+
+.weekly-collection-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid rgba(124, 148, 115, 0.17);
+  border-radius: 9px;
+  background: rgba(124, 148, 115, 0.055);
+  color: rgba(243, 239, 226, 0.46);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.weekly-collection-filter select {
+  flex: 0 1 170px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 7px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.52);
+  color: var(--cream-text);
+  font-size: 9px;
+}
+
+.weekly-collection-filter select option {
+  color: var(--ink);
+  background: var(--paper);
 }
 
 .weekly-plan-actions {
