@@ -932,6 +932,14 @@ document.getElementById('plan-badge').addEventListener('click', async () => {
     await loadPremiumRequestStatus();
 });
 
+document.getElementById('weekly-plan-upgrade-btn').addEventListener('click', async () => {
+    plansReturnState = { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' };
+    trackAnalyticsEvent('premium_feature_cta_clicked', { feature: 'weekly_plan' });
+    mostrarSubVista(viewPlans, null, 'plans');
+    await loadPlanState();
+    await loadPremiumRequestStatus();
+});
+
 document.getElementById('back-from-plans-btn').addEventListener('click', () => {
     mostrarSubVista(plansReturnState.view, plansReturnState.tab, plansReturnState.screen);
 });

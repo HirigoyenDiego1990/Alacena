@@ -104,7 +104,7 @@ begin
         'generation_remaining', greatest(v_generation_limit - v_generation_used, 0),
         'pantry_limit', case when v_plan = 'premium' then null else 20 end,
         'saved_recipe_limit', case when v_plan = 'premium' then null else 10 end,
-        'alacena_results', case when v_plan = 'premium' then 5 else 2 end,
+        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
         'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
     );
 end;
@@ -174,7 +174,7 @@ begin
             'generation_limit', v_limit,
             'generation_used', coalesce(v_used, v_limit),
             'generation_remaining', 0,
-            'alacena_results', case when v_plan = 'premium' then 5 else 2 end,
+            'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
             'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
         );
     end if;
@@ -190,7 +190,7 @@ begin
         'generation_limit', v_limit,
         'generation_used', v_used,
         'generation_remaining', greatest(v_limit - v_used, 0),
-        'alacena_results', case when v_plan = 'premium' then 5 else 2 end,
+        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
         'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
     );
 end;

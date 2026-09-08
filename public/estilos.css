@@ -1768,6 +1768,23 @@ button[type="submit"]:hover {
   line-height: 1.5;
 }
 
+.weekly-plan-upgrade-btn {
+  margin-top: 18px;
+  padding: 10px 18px;
+  border: 1px solid rgba(232, 163, 61, 0.42);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--saffron), #f1b654);
+  color: #18261d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.weekly-plan-upgrade-btn:hover {
+  filter: brightness(1.06);
+}
+
 .weekly-plan-content {
   display: flex;
   flex-direction: column;
