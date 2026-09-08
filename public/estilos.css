@@ -1337,6 +1337,145 @@ button[type="submit"]:hover {
   color: var(--cream-text);
 }
 
+.budget-panel {
+  margin-bottom: 18px;
+  padding: 15px;
+  border: 1px solid rgba(232, 163, 61, 0.22);
+  border-radius: var(--r-lg);
+  background: linear-gradient(145deg, rgba(232, 163, 61, 0.075), rgba(251, 246, 236, 0.025));
+}
+
+.budget-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.budget-eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--saffron);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.budget-panel-heading h3 {
+  margin: 0;
+  color: var(--cream-text);
+  font-size: 14px;
+}
+
+.weekly-budget-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px auto;
+  align-items: end;
+  gap: 7px;
+}
+
+.weekly-budget-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: rgba(243, 239, 226, 0.48);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.weekly-budget-form input,
+.weekly-budget-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.55);
+  color: var(--cream-text);
+  font-size: 10px;
+}
+
+.weekly-budget-form select option {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.weekly-budget-form button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--saffron);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.weekly-budget-form button:disabled {
+  opacity: 0.55;
+}
+
+.budget-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.budget-summary-cards > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(251, 246, 236, 0.07);
+  border-radius: 8px;
+  background: rgba(31, 42, 34, 0.38);
+}
+
+.budget-summary-cards span,
+.budget-summary-cards strong {
+  display: block;
+}
+
+.budget-summary-cards span {
+  margin-bottom: 3px;
+  color: rgba(243, 239, 226, 0.4);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.budget-summary-cards strong {
+  overflow: hidden;
+  color: var(--cream-text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-summary-cards .is-within-budget strong {
+  color: #a9c9a0;
+}
+
+.budget-summary-cards .is-over-budget strong {
+  color: #ff9b7b;
+}
+
+.budget-status-message {
+  margin: 10px 0 0;
+  color: rgba(243, 239, 226, 0.48);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.budget-status-message.is-positive {
+  color: #a9c9a0;
+}
+
+.budget-status-message.is-negative {
+  color: #ff9b7b;
+}
+
 .shopping-manual-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 64px 82px 38px;
@@ -1467,6 +1606,42 @@ button[type="submit"]:hover {
   font-size: 9px;
 }
 
+.shopping-item-costs {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(251, 246, 236, 0.06);
+}
+
+.shopping-item .shopping-item-costs label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: rgba(243, 239, 226, 0.42);
+  font-size: 8px;
+  cursor: default;
+}
+
+.shopping-cost-input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 6px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.52);
+  color: var(--cream-text);
+  font-size: 9px;
+  text-align: right;
+}
+
+.shopping-cost-input:focus {
+  border-color: rgba(232, 163, 61, 0.55);
+}
+
 .shopping-item-origin {
   padding: 4px 6px;
   border-radius: 5px;
@@ -1551,6 +1726,18 @@ button[type="submit"]:hover {
   .shopping-list-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .weekly-budget-form {
+    grid-template-columns: minmax(0, 1fr) 70px;
+  }
+
+  .weekly-budget-form button {
+    grid-column: 1 / -1;
+  }
+
+  .shopping-item-costs {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -161,6 +161,38 @@
 
                 <div id="shopping-list-summary" class="shopping-list-summary">Preparando lista…</div>
 
+                <section class="budget-panel">
+                    <div class="budget-panel-heading">
+                        <div>
+                            <span class="budget-eyebrow">Economía semanal</span>
+                            <h3>Presupuesto de compras</h3>
+                        </div>
+                        <span class="preference-premium-badge">Premium</span>
+                    </div>
+
+                    <form id="weekly-budget-form" class="weekly-budget-form">
+                        <label>
+                            <span>Presupuesto máximo</span>
+                            <input type="number" id="weekly-budget-amount" min="0" max="999999999" step="0.01" placeholder="Ej. 50000">
+                        </label>
+                        <label>
+                            <span>Moneda</span>
+                            <select id="weekly-budget-currency">
+                                <option value="ARS">ARS</option>
+                                <option value="USD">USD</option>
+                                <option value="UYU">UYU</option>
+                                <option value="CLP">CLP</option>
+                                <option value="MXN">MXN</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </label>
+                        <button type="submit">Guardar</button>
+                    </form>
+
+                    <div id="budget-summary-cards" class="budget-summary-cards"></div>
+                    <p id="budget-status-message" class="budget-status-message">Agregá precios para calcular la proyección semanal.</p>
+                </section>
+
                 <form id="shopping-manual-form" class="shopping-manual-form">
                     <input type="text" id="shopping-item-name" maxlength="100" placeholder="Agregar otro producto…" aria-label="Producto">
                     <input type="number" id="shopping-item-quantity" min="0.01" max="99999" step="0.01" value="1" aria-label="Cantidad">

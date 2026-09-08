@@ -1223,6 +1223,8 @@ const shoppingListState = {
     listId: null,
     userId: null,
     items: [],
+    budgetAmount: null,
+    currency: 'ARS',
     loadVersion: 0
 };
 
@@ -1238,6 +1240,63 @@ function normalizarClaveCompra(value) {
 
 function redondearCantidadCompra(value) {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function formatearDinero(value) {
+    const amount = Number(value) || 0;
+    const currency = shoppingListState.currency || 'ARS';
+    try {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: currency === 'CLP' ? 0 : 2
+        }).format(amount);
+    } catch (error) {
+        return `${currency} ${formatearCantidad(amount)}`;
+    }
+}
+
+function renderBudgetSummary() {
+    const cards = document.getElementById('budget-summary-cards');
+    const status = document.getElementById('budget-status-message');
+    if (!cards || !status) return;
+
+    const hasBudget = shoppingListState.budgetAmount !== null && Number.isFinite(Number(shoppingListState.budgetAmount));
+    const budget = hasBudget ? Number(shoppingListState.budgetAmount) : 0;
+    const estimated = shoppingListState.items.reduce((total, item) => total + (Number(item.estimated_cost) || 0), 0);
+    const spent = shoppingListState.items.reduce((total, item) => {
+        if (!item.is_checked) return total;
+        const hasActual = item.actual_cost !== null && item.actual_cost !== undefined;
+        return total + (hasActual ? Number(item.actual_cost) : (Number(item.estimated_cost) || 0));
+    }, 0);
+    const projected = shoppingListState.items.reduce((total, item) => {
+        const hasActual = item.actual_cost !== null && item.actual_cost !== undefined;
+        return total + (hasActual ? Number(item.actual_cost) : (Number(item.estimated_cost) || 0));
+    }, 0);
+    const difference = budget - projected;
+
+    cards.innerHTML = `
+        <div><span>Presupuesto</span><strong>${hasBudget ? formatearDinero(budget) : 'Sin definir'}</strong></div>
+        <div><span>Estimado</span><strong>${formatearDinero(estimated)}</strong></div>
+        <div><span>Gastado</span><strong>${formatearDinero(spent)}</strong></div>
+        <div class="${hasBudget && difference < 0 ? 'is-over-budget' : 'is-within-budget'}">
+            <span>${hasBudget && difference < 0 ? 'Exceso' : 'Disponible'}</span>
+            <strong>${hasBudget ? formatearDinero(Math.abs(difference)) : '—'}</strong>
+        </div>
+    `;
+
+    status.className = 'budget-status-message';
+    if (estimated <= 0 && projected <= 0) {
+        status.textContent = 'Agregá precios para calcular la proyección semanal.';
+    } else if (!hasBudget) {
+        status.textContent = `La compra proyectada es de ${formatearDinero(projected)}. Definí un presupuesto para compararla.`;
+    } else if (difference >= 0) {
+        status.classList.add('is-positive');
+        status.textContent = `La compra proyectada entra en el presupuesto y deja ${formatearDinero(difference)} disponibles.`;
+    } else {
+        status.classList.add('is-negative');
+        status.textContent = `La proyección supera el presupuesto por ${formatearDinero(Math.abs(difference))}.`;
+    }
 }
 
 function calcularComprasDesdePlan(pantryItems) {
@@ -1294,6 +1353,7 @@ function renderShoppingList() {
     const pending = shoppingListState.items.filter(item => !item.is_checked);
     const checked = shoppingListState.items.filter(item => item.is_checked);
     summary.innerHTML = `<strong>${pending.length}</strong> pendientes · <strong>${checked.length}</strong> comprados`;
+    renderBudgetSummary();
 
     if (shoppingListState.items.length === 0) {
         container.innerHTML = `
@@ -1323,6 +1383,16 @@ function renderShoppingList() {
                     ${item.source_type === 'manual'
                         ? '<button type="button" class="shopping-item-delete" aria-label="Eliminar producto">×</button>'
                         : ''}
+                    <div class="shopping-item-costs">
+                        <label>
+                            <span>Estimado total</span>
+                            <input type="number" class="shopping-cost-input" data-cost-field="estimated_cost" min="0" max="999999999" step="0.01" value="${item.estimated_cost !== null && item.estimated_cost !== undefined ? Number(item.estimated_cost) : ''}" placeholder="0">
+                        </label>
+                        <label>
+                            <span>Pagado total</span>
+                            <input type="number" class="shopping-cost-input" data-cost-field="actual_cost" min="0" max="999999999" step="0.01" value="${item.actual_cost !== null && item.actual_cost !== undefined ? Number(item.actual_cost) : ''}" placeholder="0">
+                        </label>
+                    </div>
                 </div>
             `).join('')}
         </section>
@@ -1396,6 +1466,12 @@ async function loadShoppingList({ syncFromPlan = true } = {}) {
 
         shoppingListState.listId = list.id;
         shoppingListState.userId = user.id;
+        shoppingListState.budgetAmount = list.budget_amount === null || list.budget_amount === undefined
+            ? null
+            : Number(list.budget_amount);
+        shoppingListState.currency = list.currency || 'ARS';
+        document.getElementById('weekly-budget-amount').value = shoppingListState.budgetAmount ?? '';
+        document.getElementById('weekly-budget-currency').value = shoppingListState.currency;
 
         const [itemsResult, pantryResult] = await Promise.all([
             supabase.from('shopping_list_items').select('*').eq('list_id', list.id),
@@ -1479,29 +1555,80 @@ document.getElementById('shopping-manual-form').addEventListener('submit', async
 });
 
 document.getElementById('shopping-list-items').addEventListener('change', async event => {
-    if (!event.target.classList.contains('shopping-item-check')) return;
+    const isCheck = event.target.classList.contains('shopping-item-check');
+    const isCost = event.target.classList.contains('shopping-cost-input');
+    if (!isCheck && !isCost) return;
     const row = event.target.closest('[data-shopping-item-id]');
     const item = shoppingListState.items.find(entry => String(entry.id) === row?.dataset.shoppingItemId);
     if (!item) return;
 
-    const isChecked = event.target.checked;
-    const { error } = await supabase
-        .from('shopping_list_items')
-        .update({ is_checked: isChecked, updated_at: new Date().toISOString() })
-        .eq('id', item.id);
+    const update = { updated_at: new Date().toISOString() };
+    let analyticsEvent = 'shopping_item_cost_updated';
+
+    if (isCheck) {
+        update.is_checked = event.target.checked;
+        analyticsEvent = 'shopping_item_checked';
+    } else {
+        const field = event.target.dataset.costField;
+        const amount = event.target.value === '' ? null : Number(event.target.value);
+        if (!['estimated_cost', 'actual_cost'].includes(field) || (amount !== null && (!Number.isFinite(amount) || amount < 0))) {
+            showAlert('Importe inválido', 'Ingresá un importe válido o dejá el campo vacío.', 'warning');
+            return;
+        }
+        update[field] = amount;
+    }
+
+    const { error } = await supabase.from('shopping_list_items').update(update).eq('id', item.id);
 
     if (error) {
-        trackTechnicalError('shopping_item_check', error);
+        trackTechnicalError(isCheck ? 'shopping_item_check' : 'shopping_item_cost', error);
         showAlert('Error', 'No se pudo actualizar el producto.', 'error');
-        event.target.checked = !isChecked;
+        if (isCheck) event.target.checked = !event.target.checked;
         return;
     }
 
-    trackAnalyticsEvent('shopping_item_checked', {
-        checked: isChecked,
+    trackAnalyticsEvent(analyticsEvent, isCheck ? {
+        checked: event.target.checked,
         source_type: item.source_type
-    });
+    } : { cost_type: event.target.dataset.costField });
     await loadShoppingList({ syncFromPlan: false });
+});
+
+document.getElementById('weekly-budget-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!shoppingListState.listId) return;
+
+    const amountInput = document.getElementById('weekly-budget-amount');
+    const currencyInput = document.getElementById('weekly-budget-currency');
+    const amount = amountInput.value === '' ? null : Number(amountInput.value);
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0)) {
+        showAlert('Presupuesto inválido', 'Ingresá un importe válido.', 'warning');
+        return;
+    }
+
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    const { error } = await supabase
+        .from('shopping_lists')
+        .update({
+            budget_amount: amount,
+            currency: currencyInput.value,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', shoppingListState.listId);
+    submitButton.disabled = false;
+
+    if (error) {
+        trackTechnicalError('weekly_budget_save', error);
+        showAlert('Error', 'No se pudo guardar el presupuesto.', 'error');
+        return;
+    }
+
+    shoppingListState.budgetAmount = amount;
+    shoppingListState.currency = currencyInput.value;
+    renderBudgetSummary();
+    trackAnalyticsEvent('weekly_budget_updated', { currency: currencyInput.value });
+    showAlert('Presupuesto guardado', 'La comparación semanal ya está actualizada.', 'success');
 });
 
 document.getElementById('shopping-list-items').addEventListener('click', async event => {
