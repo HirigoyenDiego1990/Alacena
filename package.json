@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "node --test tests/recipe-service.test.js"
+    "start": "node --use-system-ca index.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",

@@ -182,6 +182,33 @@ const recipesContainer = document.getElementById('recipes-container');
 
 let userIngredients = [];
 
+const LOCAL_STATE_USER_KEY = 'alacena.localStateUser.v1';
+const TRANSIENT_LOCAL_STORAGE_KEYS = [
+    'alacena.recetasEnPantalla.v1',
+    'alacena.activeCookingSession.v1',
+    'alacena.cookingTimer.v1'
+];
+
+function limpiarEstadoLocalPrivado() {
+    TRANSIENT_LOCAL_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+    Object.keys(localStorage)
+        .filter(key => key.startsWith('alacena.cookingProgress.v1.'))
+        .forEach(key => localStorage.removeItem(key));
+
+    if (recipesContainer) recipesContainer.innerHTML = '';
+    document.getElementById('btn-resume-cooking')?.classList.add('hidden');
+    document.getElementById('cooking-mode-view')?.classList.remove('active');
+}
+
+function prepararEstadoLocalUsuario(userId) {
+    if (!userId) return;
+    const previousUserId = localStorage.getItem(LOCAL_STATE_USER_KEY);
+    if (!previousUserId || previousUserId !== userId) {
+        limpiarEstadoLocalPrivado();
+    }
+    localStorage.setItem(LOCAL_STATE_USER_KEY, userId);
+}
+
 // Inicializar Iconos
 lucide.createIcons();
 
@@ -190,7 +217,9 @@ supabase.auth.getSession().then(async ({ data: { session } }) => {
     if (!session) {
         window.location.href = 'login.html';
     } else {
+        prepararEstadoLocalUsuario(session.user.id);
         await loadPlanState();
+        await loadAdminAccess();
         inicializarAnalytics();
         loadPantry();
     }
@@ -199,12 +228,15 @@ supabase.auth.getSession().then(async ({ data: { session } }) => {
 supabase.auth.onAuthStateChange((event, session) => {
     if (!session) {
         window.location.href = 'login.html';
+    } else {
+        prepararEstadoLocalUsuario(session.user.id);
     }
 });
 
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
+        limpiarEstadoLocalPrivado();
         await supabase.auth.signOut();
         window.location.href = 'login.html';
     });
@@ -513,55 +545,89 @@ window.cerrarModalAlerta = function() {
 
 // Guardar Receta en Favoritos (Supabase)
 window.saveRecipe = async function(recipe, event) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const btn = event?.currentTarget;
+    if (btn?.disabled) return;
+    if (btn) btn.disabled = true;
+    let keepButtonDisabled = false;
 
-    if (currentPlanState.saved_recipe_limit !== null) {
-        const { count, error: countError } = await supabase
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const recipeSteps = [recipe.instructions];
+        const { data: duplicateCandidates, error: duplicateCheckError } = await supabase
             .from('saved_recipes')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id);
+            .select('id,steps')
+            .eq('user_id', user.id)
+            .eq('title', recipe.title)
+            .eq('time', recipe.time);
 
-        if (!countError && count >= currentPlanState.saved_recipe_limit) {
-            showAlert('Límite del plan Free', `Podés guardar hasta ${currentPlanState.saved_recipe_limit} recetas.`, 'warning');
+        if (duplicateCheckError) throw duplicateCheckError;
+
+        const isAlreadySaved = (duplicateCandidates || []).some(candidate =>
+            JSON.stringify(candidate.steps || []) === JSON.stringify(recipeSteps)
+        );
+
+        if (isAlreadySaved) {
+            keepButtonDisabled = true;
+            btn?.classList.add('is-saved');
+            btn?.setAttribute('aria-label', 'Receta guardada');
+            if (btn) btn.title = 'Receta guardada';
+            showAlert('Ya está guardada', 'Esta receta ya se encuentra en tus favoritas.', 'info');
             return;
         }
-    }
 
-    const { data, error } = await supabase.from('saved_recipes').insert([{
-        user_id: user.id,
-        title: recipe.title,
-        time: recipe.time,
-        difficulty: String(recipe.difficulty),
-        ingredients: Array.isArray(userIngredients) ? userIngredients.map(i => i.ingredient) : [],
-        steps: [recipe.instructions],
-        required_ingredients: Array.isArray(recipe.required_ingredients) ? recipe.required_ingredients : [],
-        missing_ingredients: Array.isArray(recipe.missing_ingredients) ? recipe.missing_ingredients : [],
-        servings: Number(recipe.servings) || 2,
-        duration_minutes: Number(recipe.duration_minutes) || null,
-        recipe_type: recipe.type === 'sugerencia' ? 'sugerencia' : 'alacena',
-        chef_tip: recipe.chef_tip || null,
-        tags: Array.isArray(recipe.tags) ? recipe.tags : []
-    }]);
+        if (currentPlanState.saved_recipe_limit !== null) {
+            const { count, error: countError } = await supabase
+                .from('saved_recipes')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', user.id);
 
-    if (error) {
+            if (!countError && count >= currentPlanState.saved_recipe_limit) {
+                showAlert('Límite del plan Free', `Podés guardar hasta ${currentPlanState.saved_recipe_limit} recetas.`, 'warning');
+                return;
+            }
+        }
+
+        const { error } = await supabase.from('saved_recipes').insert([{
+            user_id: user.id,
+            title: recipe.title,
+            time: recipe.time,
+            difficulty: String(recipe.difficulty),
+            ingredients: Array.isArray(userIngredients) ? userIngredients.map(i => i.ingredient) : [],
+            steps: recipeSteps,
+            required_ingredients: Array.isArray(recipe.required_ingredients) ? recipe.required_ingredients : [],
+            missing_ingredients: Array.isArray(recipe.missing_ingredients) ? recipe.missing_ingredients : [],
+            servings: Number(recipe.servings) || 2,
+            duration_minutes: Number(recipe.duration_minutes) || null,
+            recipe_type: recipe.type === 'sugerencia' ? 'sugerencia' : 'alacena',
+            chef_tip: recipe.chef_tip || null,
+            tags: Array.isArray(recipe.tags) ? recipe.tags : []
+        }]);
+
+        if (error) throw error;
+
+        keepButtonDisabled = true;
+        trackAnalyticsEvent('recipe_saved', {
+            recipe_id: await obtenerIdReceta(recipe.title)
+        });
+        showAlert('¡Guardada!', 'La receta se guardó en tus favoritas con éxito.', 'success');
+        if (btn) {
+            btn.classList.add('is-saved');
+            btn.setAttribute('aria-label', 'Receta guardada');
+            btn.title = 'Receta guardada';
+            btn.classList.remove('saved-pulse');
+            void btn.offsetWidth;
+            btn.classList.add('saved-pulse');
+        }
+    } catch (error) {
         trackTechnicalError('recipe_save', error);
         const message = error.message?.includes('FREE_SAVED_RECIPE_LIMIT')
             ? 'Alcanzaste el máximo de 10 recetas guardadas del plan Free.'
             : 'No se pudo guardar la receta.';
         showAlert('Error', message, 'error');
-    } else {
-        trackAnalyticsEvent('recipe_saved', {
-            recipe_id: await obtenerIdReceta(recipe.title)
-        });
-        showAlert('¡Guardada!', 'La receta se guardó en tus favoritas con éxito.', 'success');
-        // Pequeño pulso visual en el botón de guardar como confirmación extra
-        const btn = event && event.currentTarget;
-        if (btn) {
-            btn.classList.remove('saved-pulse');
-            void btn.offsetWidth; // fuerza reinicio de la animación si se guarda varias veces
-            btn.classList.add('saved-pulse');
-        }
+    } finally {
+        if (btn && !keepButtonDisabled) btn.disabled = false;
     }
 }
 
@@ -805,13 +871,15 @@ const viewPreferences = document.getElementById('view-preferences');
 const viewWeeklyPlan = document.getElementById('view-weekly-plan');
 const viewShoppingList = document.getElementById('view-shopping-list');
 const viewPlans = document.getElementById('view-plans');
+const viewPremiumPayment = document.getElementById('view-premium-payment');
+const viewAdmin = document.getElementById('view-admin');
 const tabSaved = document.getElementById('tab-saved');
 const tabCook = document.querySelector('nav button:first-child');
 const tabPreferences = document.getElementById('tab-preferences');
 const tabWeeklyPlan = document.getElementById('tab-weekly-plan');
 
 function mostrarSubVista(view, activeTab, screenName) {
-    [viewCook, viewSaved, viewPreferences, viewWeeklyPlan, viewShoppingList, viewPlans].forEach(item => item?.classList.add('hidden'));
+    [viewCook, viewSaved, viewPreferences, viewWeeklyPlan, viewShoppingList, viewPlans, viewPremiumPayment, viewAdmin].forEach(item => item?.classList.add('hidden'));
     [tabCook, tabSaved, tabPreferences, tabWeeklyPlan].forEach(item => item?.classList.remove('active'));
 
     view?.classList.remove('hidden');
@@ -885,7 +953,7 @@ function updatePlansView() {
         requestButton.textContent = 'Tu plan Premium está activo';
     } else if (requestButton) {
         requestButton.disabled = false;
-        requestButton.textContent = 'Solicitar acceso Premium';
+        requestButton.textContent = 'Quiero ser Premium';
     }
 }
 
@@ -902,7 +970,7 @@ async function loadPremiumRequestStatus() {
     if (!user) return;
     const { data, error } = await supabase
         .from('premium_upgrade_requests')
-        .select('status,requested_at')
+        .select('status,requested_at,payment_reported_at')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -913,9 +981,11 @@ async function loadPremiumRequestStatus() {
     }
 
     if (data?.status === 'pending' || data?.status === 'contacted') {
-        requestButton.disabled = true;
-        requestButton.textContent = 'Solicitud enviada';
-        statusText.textContent = 'Tu solicitud está registrada. Solicitar acceso no genera ningún cobro.';
+        requestButton.disabled = false;
+        requestButton.textContent = 'Ver instrucciones de pago';
+        statusText.textContent = data?.payment_reported_at
+            ? 'Recibimos tu aviso de pago. La activación está pendiente de revisión.'
+            : 'Ya registraste tu interés. Podés continuar con la transferencia.';
     } else if (data?.status === 'approved') {
         requestButton.disabled = true;
         requestButton.textContent = 'Solicitud aprobada';
@@ -923,7 +993,7 @@ async function loadPremiumRequestStatus() {
     } else if (data?.status === 'rejected' || data?.status === 'cancelled') {
         statusText.textContent = 'Podés enviar una nueva solicitud cuando quieras.';
     } else {
-        statusText.textContent = 'Registrá tu interés para acceder cuando habilitemos la activación.';
+        statusText.textContent = 'Transferí y enviá el aviso para solicitar la activación.';
     }
 }
 
@@ -964,27 +1034,293 @@ document.getElementById('back-from-plans-btn').addEventListener('click', () => {
     mostrarSubVista(plansReturnState.view, plansReturnState.tab, plansReturnState.screen);
 });
 
-document.getElementById('request-premium-btn').addEventListener('click', async event => {
-    if (currentPlanState.plan === 'premium') return;
-    event.currentTarget.disabled = true;
+let premiumPaymentConfig = null;
 
-    const { data, error } = await supabase.rpc('request_premium_upgrade');
+function formatPremiumPrice(amount, currency) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) return 'Precio a confirmar';
+
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: currency || 'ARS',
+        maximumFractionDigits: 0
+    }).format(numericAmount);
+}
+
+async function loadPremiumPaymentScreen() {
+    const price = document.getElementById('premium-payment-price');
+    const duration = document.getElementById('premium-payment-duration');
+    const provider = document.getElementById('premium-payment-provider');
+    const holder = document.getElementById('premium-payment-holder');
+    const alias = document.getElementById('premium-payment-alias');
+    const accountId = document.getElementById('premium-payment-account-id');
+    const accountIdRow = document.getElementById('premium-payment-account-id-row');
+    const accountList = document.getElementById('premium-payment-account');
+    const unavailable = document.getElementById('premium-payment-unavailable');
+    const submitButton = document.getElementById('submit-premium-payment-btn');
+    const emailInput = document.getElementById('premium-contact-email');
+
+    try {
+        const response = await fetch('/api/premium-payment-config');
+        if (!response.ok) throw new Error('PAYMENT_CONFIG_UNAVAILABLE');
+        premiumPaymentConfig = await response.json();
+    } catch (error) {
+        premiumPaymentConfig = { configured: false };
+        trackTechnicalError('premium_payment_config_load', error);
+    }
+
+    const isConfigured = Boolean(premiumPaymentConfig?.configured);
+    price.textContent = formatPremiumPrice(premiumPaymentConfig?.price, premiumPaymentConfig?.currency);
+    duration.textContent = premiumPaymentConfig?.duration || '—';
+    provider.textContent = premiumPaymentConfig?.provider || 'Transferencia';
+    holder.textContent = premiumPaymentConfig?.holder || '—';
+    alias.textContent = premiumPaymentConfig?.alias || '—';
+    accountId.textContent = premiumPaymentConfig?.accountId || '—';
+    accountIdRow.classList.toggle('hidden', !premiumPaymentConfig?.accountId);
+    accountList.classList.toggle('hidden', !isConfigured);
+    unavailable.classList.toggle('hidden', isConfigured);
+    submitButton.disabled = !isConfigured;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) emailInput.value = user.email;
+}
+
+async function openPremiumPayment() {
+    if (currentPlanState.plan === 'premium') return;
+    mostrarSubVista(viewPremiumPayment, null, 'premium_payment');
+    trackAnalyticsEvent('premium_payment_instructions_opened');
+    await loadPremiumPaymentScreen();
+}
+
+document.getElementById('request-premium-btn').addEventListener('click', openPremiumPayment);
+
+document.getElementById('back-from-premium-payment-btn').addEventListener('click', async () => {
+    mostrarSubVista(viewPlans, null, 'plans');
+    await loadPremiumRequestStatus();
+});
+
+document.getElementById('premium-payment-details').addEventListener('click', async event => {
+    const button = event.target.closest('.copy-payment-btn');
+    if (!button) return;
+    const value = document.getElementById(button.dataset.copyTarget)?.textContent?.trim();
+    if (!value || value === '—') return;
+
+    try {
+        await navigator.clipboard.writeText(value);
+        const originalText = button.textContent;
+        button.textContent = 'Copiado';
+        window.setTimeout(() => { button.textContent = originalText; }, 1600);
+        trackAnalyticsEvent('premium_payment_detail_copied', {
+            field: button.dataset.copyTarget.includes('alias') ? 'alias' : 'account_id'
+        });
+    } catch (error) {
+        trackTechnicalError('premium_payment_copy', error);
+        showAlert('No se pudo copiar', 'Seleccioná el dato y copialo manualmente.', 'warning');
+    }
+});
+
+document.getElementById('premium-payment-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!premiumPaymentConfig?.configured || currentPlanState.plan === 'premium') return;
+
+    const submitButton = document.getElementById('submit-premium-payment-btn');
+    const statusText = document.getElementById('premium-payment-form-status');
+    submitButton.disabled = true;
+    statusText.textContent = 'Enviando tu aviso…';
+
+    const { data, error } = await supabase.rpc('submit_premium_payment_request', {
+        p_contact_email: document.getElementById('premium-contact-email').value.trim(),
+        p_payer_name: document.getElementById('premium-payer-name').value.trim(),
+        p_payment_reference: document.getElementById('premium-payment-reference').value.trim() || null
+    });
     if (error) {
-        trackTechnicalError('premium_upgrade_request', error);
-        event.currentTarget.disabled = false;
-        showAlert('Error', 'No se pudo registrar la solicitud.', 'error');
+        trackTechnicalError('premium_payment_request', error);
+        submitButton.disabled = false;
+        statusText.textContent = '';
+        showAlert('No se pudo enviar', 'Revisá los datos e intentá nuevamente.', 'error');
         return;
     }
 
     if (data?.status === 'already_premium') {
         await loadPlanState();
+        statusText.textContent = 'Tu plan Premium ya está activo.';
+        return;
     }
 
-    trackAnalyticsEvent('premium_upgrade_requested', {
+    trackAnalyticsEvent('premium_payment_reported', {
         request_status: data?.status || 'pending'
     });
-    showAlert('Solicitud registrada', 'No se realizó ningún cobro.', 'success');
-    await loadPremiumRequestStatus();
+    statusText.textContent = 'Aviso recibido. Revisaremos la transferencia antes de activar Premium.';
+    showAlert('¡Aviso recibido!', 'La activación quedará pendiente de revisión manual.', 'success');
+});
+
+let isAppAdmin = false;
+let adminRequests = [];
+let adminStatusFilter = 'open';
+let adminReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
+
+function escapeAdminText(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function formatAdminDate(value) {
+    if (!value) return 'Sin informar';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Sin informar';
+    return new Intl.DateTimeFormat('es-AR', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+    }).format(date);
+}
+
+function adminStatusLabel(status) {
+    return ({
+        pending: 'Pendiente',
+        contacted: 'Contactado',
+        approved: 'Aprobado',
+        rejected: 'Rechazado',
+        cancelled: 'Cancelado'
+    })[status] || status;
+}
+
+function updateAdminSummary() {
+    const openCount = adminRequests.filter(request => ['pending', 'contacted'].includes(request.status)).length;
+    const approvedCount = adminRequests.filter(request => request.status === 'approved').length;
+    const badge = document.getElementById('admin-pending-badge');
+
+    document.getElementById('admin-pending-count').textContent = openCount;
+    document.getElementById('admin-approved-count').textContent = approvedCount;
+    badge.textContent = openCount > 99 ? '99+' : openCount;
+    badge.classList.toggle('hidden', openCount === 0);
+}
+
+function renderAdminRequests() {
+    const list = document.getElementById('admin-requests-list');
+    const visibleRequests = adminStatusFilter === 'all'
+        ? adminRequests
+        : adminRequests.filter(request => ['pending', 'contacted'].includes(request.status));
+
+    updateAdminSummary();
+    if (visibleRequests.length === 0) {
+        list.innerHTML = `<p class="admin-empty-state">${adminStatusFilter === 'open' ? 'No hay pagos pendientes de revisión.' : 'Todavía no hay solicitudes para mostrar.'}</p>`;
+        return;
+    }
+
+    list.innerHTML = visibleRequests.map(request => {
+        const isOpen = ['pending', 'contacted'].includes(request.status);
+        return `
+            <article class="admin-request-card" data-request-user-id="${escapeAdminText(request.user_id)}">
+                <div class="admin-request-heading">
+                    <div>
+                        <h3>${escapeAdminText(request.payer_name || 'Sin nombre informado')}</h3>
+                        <p>${escapeAdminText(request.contact_email || 'Sin correo informado')}</p>
+                    </div>
+                    <span class="admin-status-badge" data-status="${escapeAdminText(request.status)}">${escapeAdminText(adminStatusLabel(request.status))}</span>
+                </div>
+                <div class="admin-request-details">
+                    <div><span>Referencia</span><strong>${escapeAdminText(request.payment_reference || 'No informada')}</strong></div>
+                    <div><span>Aviso recibido</span><strong>${escapeAdminText(formatAdminDate(request.payment_reported_at || request.requested_at))}</strong></div>
+                </div>
+                ${isOpen ? `
+                    <div class="admin-request-actions">
+                        <button type="button" class="admin-action-btn" data-admin-action="contact">Contactado</button>
+                        <button type="button" class="admin-action-btn admin-action-btn--reject" data-admin-action="reject">Rechazar</button>
+                        <button type="button" class="admin-action-btn admin-action-btn--approve" data-admin-action="approve">Aprobar 30 días</button>
+                    </div>
+                ` : ''}
+            </article>
+        `;
+    }).join('');
+}
+
+async function loadAdminRequests() {
+    if (!isAppAdmin) return;
+    const list = document.getElementById('admin-requests-list');
+    if (!viewAdmin.classList.contains('hidden')) {
+        list.innerHTML = '<p class="admin-empty-state">Actualizando solicitudes…</p>';
+    }
+
+    const { data, error } = await supabase.rpc('list_premium_upgrade_requests');
+    if (error) {
+        trackTechnicalError('admin_requests_load', error);
+        if (!viewAdmin.classList.contains('hidden')) {
+            list.innerHTML = '<p class="admin-empty-state">No se pudieron cargar las solicitudes.</p>';
+        }
+        return;
+    }
+
+    adminRequests = Array.isArray(data) ? data : [];
+    renderAdminRequests();
+}
+
+async function loadAdminAccess() {
+    const adminButton = document.getElementById('admin-panel-btn');
+    const { data, error } = await supabase.rpc('is_app_admin');
+    isAppAdmin = !error && data === true;
+    adminButton.classList.toggle('hidden', !isAppAdmin);
+    if (isAppAdmin) await loadAdminRequests();
+}
+
+document.getElementById('admin-panel-btn').addEventListener('click', async () => {
+    if (!isAppAdmin) return;
+    adminReturnState = obtenerVistaActualParaVolver();
+    mostrarSubVista(viewAdmin, null, 'admin_premium_requests');
+    await loadAdminRequests();
+});
+
+document.getElementById('back-from-admin-btn').addEventListener('click', () => {
+    mostrarSubVista(adminReturnState.view, adminReturnState.tab, adminReturnState.screen);
+});
+
+document.getElementById('refresh-admin-requests-btn').addEventListener('click', loadAdminRequests);
+
+document.querySelector('.admin-filter-row').addEventListener('click', event => {
+    const button = event.target.closest('.admin-filter-btn');
+    if (!button) return;
+    adminStatusFilter = button.dataset.adminStatus;
+    document.querySelectorAll('.admin-filter-btn').forEach(item => item.classList.toggle('active', item === button));
+    renderAdminRequests();
+});
+
+document.getElementById('admin-requests-list').addEventListener('click', async event => {
+    const button = event.target.closest('[data-admin-action]');
+    const card = event.target.closest('[data-request-user-id]');
+    if (!button || !card || !isAppAdmin) return;
+
+    const action = button.dataset.adminAction;
+    const messages = {
+        approve: '¿Confirmás que verificaste el pago en Prex y querés activar Premium por 30 días?',
+        reject: '¿Querés rechazar esta solicitud?',
+        contact: null
+    };
+    if (messages[action] && !window.confirm(messages[action])) return;
+
+    card.querySelectorAll('button').forEach(item => { item.disabled = true; });
+    const { data, error } = await supabase.rpc('review_premium_upgrade_request', {
+        p_user_id: card.dataset.requestUserId,
+        p_action: action
+    });
+
+    if (error) {
+        trackTechnicalError('admin_request_review', error, { action });
+        card.querySelectorAll('button').forEach(item => { item.disabled = false; });
+        showAlert('No se pudo actualizar', 'La solicitud no cambió. Intentá nuevamente.', 'error');
+        return;
+    }
+
+    trackAnalyticsEvent('admin_premium_request_reviewed', { action });
+    const successMessage = action === 'approve'
+        ? 'Premium quedó activo por 30 días.'
+        : action === 'reject'
+            ? 'La solicitud fue rechazada.'
+            : 'La solicitud quedó marcada como contactada.';
+    showAlert('Solicitud actualizada', successMessage, 'success');
+    if (data?.status) await loadAdminRequests();
 });
 
 function normalizarListaPreferencias(value) {

@@ -42,14 +42,20 @@
                 </div>
             </div>
             
-            <button id="logout-btn" class="logout-pill-btn" title="Cerrar sesión">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                <span>Salir</span>
-            </button>
+            <div class="topbar-actions">
+                <button type="button" id="admin-panel-btn" class="admin-panel-btn hidden" title="Administrar solicitudes Premium" aria-label="Administrar solicitudes Premium">
+                    <i data-lucide="shield-check"></i>
+                    <span id="admin-pending-badge" class="admin-pending-badge hidden">0</span>
+                </button>
+                <button id="logout-btn" class="logout-pill-btn" title="Cerrar sesión">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Salir</span>
+                </button>
+            </div>
         </header>
 
         <main class="screen-pad" style="flex: 1;">
@@ -415,12 +421,112 @@
                             <li>Plan semanal y lista consolidada</li>
                             <li>Presupuesto, historial y colecciones</li>
                         </ul>
-                        <button type="button" id="request-premium-btn" class="request-premium-btn">Solicitar acceso Premium</button>
+                        <button type="button" id="request-premium-btn" class="request-premium-btn">Quiero ser Premium</button>
                         <p id="premium-request-status" class="premium-request-status"></p>
                     </article>
                 </div>
 
-                <p class="plans-payment-note">La activación y los pagos se conectarán próximamente. Solicitar acceso no genera ningún cobro.</p>
+                <p class="plans-payment-note">La activación es manual: transferís, avisás el pago y revisamos tu solicitud.</p>
+            </div>
+
+            <!-- Sub-vista: activación manual de Premium -->
+            <div id="view-premium-payment" class="sub-view hidden">
+                <button type="button" id="back-from-premium-payment-btn" class="shopping-back-btn">‹ Volver a los planes</button>
+
+                <section class="premium-payment-hero">
+                    <span class="plans-eyebrow">Activación manual</span>
+                    <h2>Estás a un paso de Premium</h2>
+                    <p>Transferí usando los datos de abajo y después avisame desde este formulario. Revisaré el pago antes de activar tu cuenta.</p>
+                    <div class="premium-payment-price">
+                        <span>Plan Premium</span>
+                        <strong id="premium-payment-price">Precio a confirmar</strong>
+                        <small id="premium-payment-duration">—</small>
+                    </div>
+                </section>
+
+                <section id="premium-payment-details" class="premium-payment-card">
+                    <div class="premium-payment-card-heading">
+                        <div><span>Paso 1</span><h3>Hacé la transferencia</h3></div>
+                        <span id="premium-payment-provider" class="payment-provider-badge">Transferencia</span>
+                    </div>
+
+                    <div id="premium-payment-unavailable" class="payment-config-warning hidden">
+                        Los datos de pago todavía no están configurados. Volvé a intentarlo más tarde.
+                    </div>
+
+                    <dl id="premium-payment-account" class="payment-account-list">
+                        <div><dt>Titular</dt><dd id="premium-payment-holder">—</dd></div>
+                        <div>
+                            <dt>Alias</dt>
+                            <dd><span id="premium-payment-alias">—</span><button type="button" class="copy-payment-btn" data-copy-target="premium-payment-alias">Copiar</button></dd>
+                        </div>
+                        <div id="premium-payment-account-id-row" class="hidden">
+                            <dt>CBU / CVU</dt>
+                            <dd><span id="premium-payment-account-id">—</span><button type="button" class="copy-payment-btn" data-copy-target="premium-payment-account-id">Copiar</button></dd>
+                        </div>
+                    </dl>
+
+                    <p class="payment-safety-note">Verificá que el titular coincida antes de transferir. La activación no es automática.</p>
+                </section>
+
+                <section class="premium-payment-card">
+                    <div class="premium-payment-card-heading">
+                        <div><span>Paso 2</span><h3>Avisame que pagaste</h3></div>
+                    </div>
+
+                    <form id="premium-payment-form" class="premium-payment-form">
+                        <label>
+                            <span>Correo de tu cuenta</span>
+                            <input type="email" id="premium-contact-email" autocomplete="email" maxlength="254" readonly required>
+                        </label>
+                        <label>
+                            <span>Nombre que figura en la transferencia</span>
+                            <input type="text" id="premium-payer-name" autocomplete="name" maxlength="120" placeholder="Ej.: Diego Hirigoyen" required>
+                        </label>
+                        <label>
+                            <span>Número de operación o referencia <small>(opcional)</small></span>
+                            <input type="text" id="premium-payment-reference" maxlength="120" placeholder="Ej.: 12345678">
+                        </label>
+                        <label class="premium-payment-confirmation">
+                            <input type="checkbox" id="premium-payment-confirmed" required>
+                            <span>Confirmo que ya realicé la transferencia.</span>
+                        </label>
+                        <button type="submit" id="submit-premium-payment-btn" class="request-premium-btn">Enviar aviso de pago</button>
+                    </form>
+
+                    <p id="premium-payment-form-status" class="premium-payment-form-status"></p>
+                    <p class="payment-privacy-note">Estos datos se usan únicamente para verificar el pago y activar Premium. Nunca se envían a Analytics.</p>
+                </section>
+            </div>
+
+            <!-- Sub-vista privada: administración de Premium -->
+            <div id="view-admin" class="sub-view hidden">
+                <button type="button" id="back-from-admin-btn" class="shopping-back-btn">‹ Volver</button>
+
+                <section class="admin-hero">
+                    <div>
+                        <span class="plans-eyebrow">Solo administrador</span>
+                        <h2>Solicitudes Premium</h2>
+                        <p>Compará cada aviso con el movimiento recibido en Prex antes de aprobarlo.</p>
+                    </div>
+                    <button type="button" id="refresh-admin-requests-btn" class="admin-refresh-btn" aria-label="Actualizar solicitudes">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                </section>
+
+                <div class="admin-summary-grid">
+                    <article><span>Pendientes</span><strong id="admin-pending-count">0</strong></article>
+                    <article><span>Aprobadas</span><strong id="admin-approved-count">0</strong></article>
+                </div>
+
+                <div class="admin-filter-row" role="group" aria-label="Filtrar solicitudes">
+                    <button type="button" class="admin-filter-btn active" data-admin-status="open">Por revisar</button>
+                    <button type="button" class="admin-filter-btn" data-admin-status="all">Todas</button>
+                </div>
+
+                <div id="admin-requests-list" class="admin-requests-list">
+                    <p class="admin-empty-state">Cargando solicitudes…</p>
+                </div>
             </div>
 
             <!-- VISTA: MODO COCINA PASO A PASO -->

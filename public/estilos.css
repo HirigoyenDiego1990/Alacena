@@ -626,6 +626,46 @@ button[type="submit"]:hover {
   margin-top: 2px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-panel-btn {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(232, 163, 61, 0.3);
+  border-radius: 50%;
+  background: rgba(232, 163, 61, 0.1);
+  color: var(--saffron);
+  cursor: pointer;
+}
+
+.admin-panel-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-pending-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid #1e1e1c;
+  border-radius: 99px;
+  background: var(--paprika);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 12px;
+}
+
 .chip-cloud .ingredient-chip strong {
   color: var(--saffron);
   font-family: var(--font-mono);
@@ -909,6 +949,429 @@ button[type="submit"]:hover {
   text-align: center;
 }
 
+/* ============================================
+   ACTIVACIÓN MANUAL DE PREMIUM
+   ============================================ */
+
+.premium-payment-hero {
+  margin-bottom: 14px;
+  padding: 23px 20px;
+  border: 1px solid rgba(232, 163, 61, 0.28);
+  border-radius: 20px;
+  background: radial-gradient(circle at top right, rgba(232, 163, 61, 0.17), transparent 42%), rgba(251, 246, 236, 0.035);
+}
+
+.premium-payment-hero h2 {
+  margin: 7px 0 8px;
+  color: var(--cream-text);
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+}
+
+.premium-payment-hero > p {
+  margin: 0;
+  color: rgba(243, 239, 226, 0.58);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.premium-payment-price {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 3px 12px;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(251, 246, 236, 0.09);
+}
+
+.premium-payment-price span,
+.premium-payment-price small {
+  color: rgba(243, 239, 226, 0.43);
+  font-size: 9px;
+}
+
+.premium-payment-price strong {
+  grid-row: span 2;
+  color: var(--saffron);
+  font-size: 20px;
+}
+
+.premium-payment-card {
+  margin-top: 12px;
+  padding: 18px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 17px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.premium-payment-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.premium-payment-card-heading span {
+  color: var(--saffron);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.premium-payment-card-heading h3 {
+  margin: 3px 0 0;
+  color: var(--cream-text);
+  font-size: 15px;
+}
+
+.payment-provider-badge {
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(124, 148, 115, 0.13);
+  color: #b8cfaf !important;
+  text-align: right;
+}
+
+.payment-account-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.payment-account-list > div {
+  padding: 11px 12px;
+  border: 1px solid rgba(251, 246, 236, 0.07);
+  border-radius: 10px;
+  background: rgba(31, 42, 34, 0.3);
+}
+
+.payment-account-list dt {
+  margin-bottom: 4px;
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.payment-account-list dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  color: var(--cream-text);
+  font-size: 11px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.copy-payment-btn {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(232, 163, 61, 0.28);
+  border-radius: 6px;
+  background: rgba(232, 163, 61, 0.09);
+  color: var(--saffron);
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.payment-config-warning {
+  padding: 12px;
+  border: 1px solid rgba(193, 80, 46, 0.25);
+  border-radius: 10px;
+  background: rgba(193, 80, 46, 0.09);
+  color: #efb6a4;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.payment-safety-note,
+.payment-privacy-note,
+.premium-payment-form-status {
+  margin: 11px 0 0;
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 8.5px;
+  line-height: 1.5;
+}
+
+.premium-payment-form {
+  display: grid;
+  gap: 12px;
+}
+
+.premium-payment-form > label:not(.premium-payment-confirmation) {
+  display: grid;
+  gap: 6px;
+  color: rgba(243, 239, 226, 0.62);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.premium-payment-form label small {
+  color: rgba(243, 239, 226, 0.32);
+  font-weight: 400;
+}
+
+.premium-payment-form input[type="email"],
+.premium-payment-form input[type="text"] {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid rgba(251, 246, 236, 0.12);
+  border-radius: 9px;
+  outline: none;
+  background: rgba(31, 42, 34, 0.35);
+  color: var(--cream-text);
+  font-size: 10px;
+}
+
+.premium-payment-form input:focus {
+  border-color: rgba(232, 163, 61, 0.65);
+}
+
+.premium-payment-form input:read-only {
+  color: rgba(243, 239, 226, 0.58);
+  cursor: default;
+}
+
+.premium-payment-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: rgba(243, 239, 226, 0.58);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.premium-payment-confirmation input {
+  margin: 1px 0 0;
+  accent-color: var(--saffron);
+}
+
+.premium-payment-form-status {
+  min-height: 13px;
+  color: #b8cfaf;
+}
+
+/* ============================================
+   PANEL PRIVADO DE ADMINISTRACIÓN
+   ============================================ */
+
+.admin-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 21px 19px;
+  border: 1px solid rgba(232, 163, 61, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(232, 163, 61, 0.11), rgba(124, 148, 115, 0.06));
+}
+
+.admin-hero h2 {
+  margin: 6px 0 7px;
+  color: var(--cream-text);
+  font-family: 'Fraunces', serif;
+  font-size: 23px;
+}
+
+.admin-hero p {
+  max-width: 360px;
+  margin: 0;
+  color: rgba(243, 239, 226, 0.5);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.admin-refresh-btn {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(251, 246, 236, 0.12);
+  border-radius: 9px;
+  background: rgba(251, 246, 236, 0.05);
+  color: var(--cream-text);
+  cursor: pointer;
+}
+
+.admin-refresh-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 13px 0;
+}
+
+.admin-summary-grid article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px;
+  border: 1px solid rgba(251, 246, 236, 0.08);
+  border-radius: 12px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.admin-summary-grid span {
+  color: rgba(243, 239, 226, 0.46);
+  font-size: 9px;
+}
+
+.admin-summary-grid strong {
+  color: var(--saffron);
+  font-size: 18px;
+}
+
+.admin-filter-row {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.admin-filter-btn {
+  padding: 7px 10px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(243, 239, 226, 0.45);
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-filter-btn.active {
+  border-color: rgba(232, 163, 61, 0.32);
+  background: rgba(232, 163, 61, 0.1);
+  color: var(--saffron);
+}
+
+.admin-requests-list {
+  display: grid;
+  gap: 11px;
+}
+
+.admin-request-card {
+  padding: 16px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 14px;
+  background: rgba(251, 246, 236, 0.035);
+}
+
+.admin-request-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-request-heading h3 {
+  margin: 0;
+  color: var(--cream-text);
+  font-size: 13px;
+}
+
+.admin-request-heading p {
+  margin: 4px 0 0;
+  color: rgba(243, 239, 226, 0.4);
+  font-size: 9px;
+  word-break: break-word;
+}
+
+.admin-status-badge {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(232, 163, 61, 0.11);
+  color: var(--saffron);
+  font-size: 7.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-status-badge[data-status="approved"] {
+  background: rgba(124, 148, 115, 0.14);
+  color: #b8cfaf;
+}
+
+.admin-status-badge[data-status="rejected"],
+.admin-status-badge[data-status="cancelled"] {
+  background: rgba(193, 80, 46, 0.1);
+  color: #ef9f87;
+}
+
+.admin-request-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 13px 0;
+}
+
+.admin-request-details div {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(31, 42, 34, 0.3);
+}
+
+.admin-request-details span {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(243, 239, 226, 0.32);
+  font-size: 7.5px;
+  text-transform: uppercase;
+}
+
+.admin-request-details strong {
+  display: block;
+  color: rgba(243, 239, 226, 0.74);
+  font-size: 9px;
+  word-break: break-word;
+}
+
+.admin-request-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 7px;
+}
+
+.admin-action-btn {
+  padding: 8px 6px;
+  border: 1px solid rgba(251, 246, 236, 0.1);
+  border-radius: 8px;
+  background: rgba(251, 246, 236, 0.04);
+  color: rgba(243, 239, 226, 0.62);
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-action-btn--approve {
+  border-color: rgba(124, 148, 115, 0.34);
+  background: rgba(124, 148, 115, 0.13);
+  color: #b8cfaf;
+}
+
+.admin-action-btn--reject {
+  color: #ef9f87;
+}
+
+.admin-empty-state {
+  padding: 30px 18px;
+  border: 1px dashed rgba(251, 246, 236, 0.1);
+  border-radius: 13px;
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 @media (max-width: 520px) {
   .plans-comparison {
     grid-template-columns: 1fr;
@@ -1042,6 +1505,18 @@ button[type="submit"]:hover {
   background: var(--saffron);
   color: var(--ink);
   border-color: var(--saffron);
+}
+
+.recipe-action-btn.btn-save.is-saved,
+.recipe-action-btn.btn-save:disabled.is-saved {
+  border-color: rgba(124, 148, 115, 0.45);
+  background: rgba(124, 148, 115, 0.18);
+  color: #b8cfaf;
+  cursor: default;
+}
+
+.recipe-action-btn.btn-save:disabled:hover {
+  transform: none;
 }
 
 .recipe-action-btn.btn-delete:hover {
