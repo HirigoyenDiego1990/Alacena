@@ -113,6 +113,14 @@
                     <span id="saved-recipes-count" class="saved-recipes-count">0 recetas</span>
                 </div>
 
+                <div id="saved-free-upsell" class="premium-inline-card hidden">
+                    <div>
+                        <strong>Organizá mejor tus recetas</strong>
+                        <p>Premium suma búsquedas, colecciones, recetas fijadas e historial de cocina.</p>
+                    </div>
+                    <button type="button" id="saved-upgrade-btn" class="premium-discovery-btn">Conocer Premium</button>
+                </div>
+
                 <div id="saved-premium-tools" class="saved-premium-tools hidden">
                     <div class="saved-library-tabs">
                         <button type="button" class="saved-library-tab active" data-library-view="favorites">Favoritas</button>
@@ -154,7 +162,7 @@
                     <span class="weekly-plan-lock-icon">🔒</span>
                     <h3>Función Premium</h3>
                     <p>El plan semanal permite organizar, bloquear y marcar comidas para cada día.</p>
-                    <button type="button" id="weekly-plan-upgrade-btn" class="weekly-plan-upgrade-btn">Conocer Premium</button>
+                    <button type="button" id="weekly-plan-upgrade-btn" class="premium-discovery-btn">Conocer Premium</button>
                 </div>
 
                 <div id="weekly-plan-content" class="weekly-plan-content hidden">
@@ -173,6 +181,15 @@
                             <option value="all">Todas mis favoritas</option>
                         </select>
                     </label>
+
+                    <div id="weekly-no-recipes" class="weekly-no-recipes hidden">
+                        <span>🍽️</span>
+                        <div>
+                            <strong>Primero guardá alguna receta</strong>
+                            <p>Generá recetas desde Cocinar y guardá tus favoritas para poder sumarlas al plan.</p>
+                        </div>
+                        <button type="button" id="weekly-go-cook-btn">Ir a cocinar</button>
+                    </div>
 
                     <div class="weekly-plan-actions">
                         <button type="button" id="autofill-week-btn" class="weekly-secondary-btn">✨ Completar espacios</button>
@@ -294,7 +311,10 @@
                             <h3>Personalización avanzada</h3>
                             <span class="preference-premium-badge">Premium</span>
                         </div>
-                        <p id="premium-preferences-message" class="premium-preferences-message">Disponible con el plan Premium.</p>
+                        <div id="premium-preferences-message" class="premium-preferences-message">
+                            <span>Disponible con el plan Premium.</span>
+                            <button type="button" id="preferences-upgrade-btn" class="premium-discovery-btn">Conocer Premium</button>
+                        </div>
 
                         <fieldset id="premium-preferences-fields" class="premium-preferences-fields" disabled>
                             <div class="preference-grid">

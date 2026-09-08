@@ -228,6 +228,7 @@ function aplicarEstadoPlan(planData) {
     const weeklyPlanLocked = document.getElementById('weekly-plan-locked');
     const weeklyPlanContent = document.getElementById('weekly-plan-content');
     const savedPremiumTools = document.getElementById('saved-premium-tools');
+    const savedFreeUpsell = document.getElementById('saved-free-upsell');
 
     if (badge) {
         badge.textContent = isPremium ? 'Premium' : 'Free';
@@ -249,6 +250,7 @@ function aplicarEstadoPlan(planData) {
     if (weeklyPlanLocked) weeklyPlanLocked.classList.toggle('hidden', isPremium);
     if (weeklyPlanContent) weeklyPlanContent.classList.toggle('hidden', !isPremium);
     if (savedPremiumTools) savedPremiumTools.classList.toggle('hidden', !isPremium);
+    if (savedFreeUpsell) savedFreeUpsell.classList.toggle('hidden', isPremium);
     updatePlansView();
 
 }
@@ -925,19 +927,37 @@ async function loadPremiumRequestStatus() {
     }
 }
 
-document.getElementById('plan-badge').addEventListener('click', async () => {
-    plansReturnState = obtenerVistaActualParaVolver();
+async function openPlans(returnState, feature = null) {
+    plansReturnState = returnState;
+    if (feature) trackAnalyticsEvent('premium_feature_cta_clicked', { feature });
     mostrarSubVista(viewPlans, null, 'plans');
     await loadPlanState();
     await loadPremiumRequestStatus();
+}
+
+document.getElementById('plan-badge').addEventListener('click', async () => {
+    await openPlans(obtenerVistaActualParaVolver());
 });
 
 document.getElementById('weekly-plan-upgrade-btn').addEventListener('click', async () => {
-    plansReturnState = { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' };
-    trackAnalyticsEvent('premium_feature_cta_clicked', { feature: 'weekly_plan' });
-    mostrarSubVista(viewPlans, null, 'plans');
-    await loadPlanState();
-    await loadPremiumRequestStatus();
+    await openPlans(
+        { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' },
+        'weekly_plan'
+    );
+});
+
+document.getElementById('saved-upgrade-btn').addEventListener('click', async () => {
+    await openPlans(
+        { view: viewSaved, tab: tabSaved, screen: 'saved_recipes' },
+        'saved_library'
+    );
+});
+
+document.getElementById('preferences-upgrade-btn').addEventListener('click', async () => {
+    await openPlans(
+        { view: viewPreferences, tab: tabPreferences, screen: 'preferences' },
+        'advanced_preferences'
+    );
 });
 
 document.getElementById('back-from-plans-btn').addEventListener('click', () => {
@@ -1200,6 +1220,20 @@ function renderWeeklyPlan() {
         collectionFilter.value = weeklyPlanState.collectionFilter;
     }
 
+    const hasRecipes = weeklyPlanState.recipes.length > 0;
+    const hasAssignedMeals = [...weeklyPlanState.meals.values()].some(meal => meal?.saved_recipe_id);
+    const showEmptyState = !hasRecipes && !hasAssignedMeals;
+    const emptyState = document.getElementById('weekly-no-recipes');
+    const collectionFilterContainer = collectionFilter?.closest('.weekly-collection-filter');
+    const autofillButton = document.getElementById('autofill-week-btn');
+    const clearButton = document.getElementById('clear-week-btn');
+
+    emptyState?.classList.toggle('hidden', !showEmptyState);
+    collectionFilterContainer?.classList.toggle('hidden', !hasRecipes);
+    if (autofillButton) autofillButton.disabled = !hasRecipes;
+    if (clearButton) clearButton.disabled = !hasAssignedMeals;
+    grid.classList.toggle('hidden', showEmptyState);
+
     grid.innerHTML = Array.from({ length: 7 }, (_, dayIndex) => {
         const dateObject = sumarDias(weeklyPlanState.weekStart, dayIndex);
         const date = fechaLocalISO(dateObject);
@@ -1222,6 +1256,10 @@ function renderWeeklyPlan() {
     const moveHint = document.getElementById('weekly-move-hint');
     moveHint?.classList.toggle('hidden', !weeklyPlanState.movingKey);
 }
+
+document.getElementById('weekly-go-cook-btn').addEventListener('click', () => {
+    mostrarSubVista(viewCook, tabCook, 'cook');
+});
 
 async function loadWeeklyPlan() {
     if (currentPlanState.plan !== 'premium') return;
