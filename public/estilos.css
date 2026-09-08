@@ -384,84 +384,138 @@ button[type="submit"]:hover {
    SECCIÓN DE INGREDIENTES & INPUT (RENOVADO)
    ============================================ */
 
-/* Contenedor del input y botón con efecto integrado */
-.ingredient-input-row {
+.ingredient-bulk-card {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 16px;
-  background: rgba(251, 246, 236, 0.03);
-  padding: 6px;
-  border: 1px solid rgba(251, 246, 236, 0.08);
-  border-radius: 16px;
-  transition: all 0.3s ease;
+  padding: 15px;
+  border: 1px solid rgba(251, 246, 236, 0.09);
+  border-radius: 17px;
+  background: rgba(251, 246, 236, 0.035);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.ingredient-input-row:focus-within {
+.ingredient-bulk-card:focus-within {
   border-color: rgba(232, 163, 61, 0.4);
-  background: rgba(251, 246, 236, 0.05);
-  box-shadow: 0 0 0 4px rgba(232, 163, 61, 0.12);
+  box-shadow: 0 0 0 4px rgba(232, 163, 61, 0.09);
 }
 
-.ingredient-input-row input,
-.ingredient-input-row select {
-  flex: 1;
-  padding: 12px 14px;
-  border: none;
-  background: transparent;
+.ingredient-bulk-label {
   color: var(--cream-text);
-  font-size: 15px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#ingredient-input {
+  width: 100%;
+  min-height: 116px;
+  padding: 12px 13px;
+  border: 1px solid rgba(251, 246, 236, 0.1);
+  border-radius: 11px;
   outline: none;
-  min-width: 0;
+  resize: vertical;
+  background: rgba(31, 42, 34, 0.56);
+  color: var(--cream-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
-.ingredient-input-row input::placeholder {
-  color: rgba(243, 239, 226, 0.35);
+#ingredient-input::placeholder {
+  color: rgba(243, 239, 226, 0.3);
 }
 
-.ingredient-input-row .ingredient-quantity {
-  flex: 0 0 62px;
-  width: 62px;
-  padding-inline: 7px;
-  text-align: center;
-  border-left: 1px solid rgba(251, 246, 236, 0.08);
+#ingredient-input:focus {
+  border-color: rgba(232, 163, 61, 0.42);
 }
 
-.ingredient-input-row .ingredient-unit {
-  flex: 0 0 80px;
-  width: 80px;
-  padding-inline: 7px;
-  border-left: 1px solid rgba(251, 246, 236, 0.08);
-  cursor: pointer;
+.ingredient-format-help {
+  margin: 0;
+  color: rgba(243, 239, 226, 0.4);
+  font-size: 9.5px;
+  line-height: 1.45;
 }
 
-.ingredient-input-row .ingredient-unit option {
-  color: var(--ink);
-  background: var(--paper);
+.ingredient-format-help strong {
+  color: rgba(243, 239, 226, 0.64);
 }
 
-/* Botón de agregar ingrediente */
-.add-btn {
-  width: 46px; 
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 12px;
-  border: none;
+.ingredient-bulk-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 31px;
+  padding: 8px;
+  border: 1px dashed rgba(251, 246, 236, 0.1);
+  border-radius: 9px;
+}
+
+.ingredient-preview-empty,
+.ingredient-preview-more,
+.ingredient-preview-error {
+  align-self: center;
+  color: rgba(243, 239, 226, 0.34);
+  font-size: 9px;
+}
+
+.ingredient-preview-chip {
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(124, 148, 115, 0.12);
+  color: rgba(243, 239, 226, 0.7);
+  font-size: 9px;
+}
+
+.ingredient-preview-chip strong {
+  margin-right: 3px;
+  color: #b8cfaf;
+}
+
+.ingredient-preview-chip em {
+  margin-left: 3px;
+  color: var(--saffron);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.ingredient-preview-more {
+  color: var(--saffron);
+}
+
+.ingredient-preview-error {
+  width: 100%;
+  color: #ff9b7b;
+}
+
+.add-ingredients-bulk-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 11px;
   background: var(--saffron);
   color: var(--ink);
-  display: grid; 
-  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 4px 12px rgba(232, 163, 61, 0.25);
+  box-shadow: 0 4px 12px rgba(232, 163, 61, 0.2);
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-.add-btn:hover {
-  background: #f1ad48;
-  transform: scale(1.05) rotate(90deg);
+.add-ingredients-bulk-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
-.add-btn:active {
-  transform: scale(0.95);
+.add-ingredients-bulk-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Contenedor de Chips (Ingredientes agregados) */
@@ -2656,21 +2710,6 @@ button[type="submit"]:hover {
 }
 
 @media (max-width: 360px) {
-  .ingredient-input-row .ingredient-quantity {
-    flex-basis: 54px;
-    width: 54px;
-  }
-
-  .ingredient-input-row .ingredient-unit {
-    flex-basis: 68px;
-    width: 68px;
-  }
-
-  .ingredient-input-row input,
-  .ingredient-input-row select {
-    font-size: 13px;
-  }
-
   .preference-grid,
   .equipment-options,
   .day-meals {

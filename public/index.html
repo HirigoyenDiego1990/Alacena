@@ -69,21 +69,18 @@
                 <h2 class="section-title">¿Qué hay en tu cocina?</h2>
                 <p class="section-sub">Agregá los ingredientes que tengas en tu heladera o alacena para armar platos que te salven la comida.</p>
 
-                <div class="ingredient-input-row">
-                    <input type="text" id="ingredient-input" placeholder="Ej. tomate, arroz…" aria-label="Ingrediente">
-                    <input type="number" id="ingredient-quantity" class="ingredient-quantity" value="1" min="0.01" max="99999" step="0.01" inputmode="decimal" aria-label="Cantidad">
-                    <select id="ingredient-unit" class="ingredient-unit" aria-label="Unidad">
-                        <option value="unidad">unidad</option>
-                        <option value="g">g</option>
-                        <option value="kg">kg</option>
-                        <option value="ml">ml</option>
-                        <option value="l">l</option>
-                        <option value="taza">taza</option>
-                        <option value="cda">cda</option>
-                        <option value="cdita">cdita</option>
-                    </select>
-                    <button type="button" id="add-ingredient-btn" class="add-btn" aria-label="Agregar ingrediente">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <div class="ingredient-bulk-card">
+                    <label for="ingredient-input" class="ingredient-bulk-label">Cargá todo junto</label>
+                    <textarea id="ingredient-input" rows="5" placeholder="500 g de arroz&#10;2 tomates&#10;1 l de leche" aria-describedby="ingredient-format-help"></textarea>
+                    <p id="ingredient-format-help" class="ingredient-format-help">Un ingrediente por renglón, o separalos con comas. También podés escribir: <strong>arroz 500 g</strong>. Si ya existe, se actualiza su cantidad.</p>
+
+                    <div id="ingredient-bulk-preview" class="ingredient-bulk-preview">
+                        <span class="ingredient-preview-empty">La vista previa aparecerá acá.</span>
+                    </div>
+
+                    <button type="button" id="add-ingredient-btn" class="add-ingredients-bulk-btn" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span id="add-ingredients-label">Agregar ingredientes</span>
                     </button>
                 </div>
 

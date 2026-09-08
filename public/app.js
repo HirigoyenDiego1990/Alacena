@@ -175,8 +175,6 @@ const authView = document.getElementById('auth-view');
 const mainView = document.getElementById('main-view');
 const authForm = document.getElementById('auth-form');
 const ingredientInput = document.getElementById('ingredient-input');
-const ingredientQuantityInput = document.getElementById('ingredient-quantity');
-const ingredientUnitInput = document.getElementById('ingredient-unit');
 const addIngredientBtn = document.getElementById('add-ingredient-btn');
 const ingredientsList = document.getElementById('ingredients-list');
 const generateBtn = document.getElementById('generate-btn');
@@ -273,6 +271,7 @@ async function loadPantry() {
     if (data) {
         userIngredients = data;
         renderIngredients();
+        renderIngredientBulkPreview();
         void obtenerMetricasIngredientes(data).then(metrics => {
             trackAnalyticsEvent('ingredient_inventory_snapshot', metrics);
         });
@@ -281,47 +280,170 @@ async function loadPantry() {
     }
 }
 
-addIngredientBtn.addEventListener('click', async () => {
-    const val = ingredientInput.value.trim();
-    const quantity = Number(ingredientQuantityInput?.value);
-    const unit = ingredientUnitInput?.value || 'unidad';
-    if (!val) return;
+const INGREDIENT_UNIT_PATTERN = '(?:unidades?|uds?|u|gramos?|grs?|gr|g|kilogramos?|kilos?|kg|mililitros?|ml|cc|litros?|lts?|lt|l|tazas?|cucharadas?|cdas?|cda|cucharaditas?|cditas?|cdita)\\b';
 
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-        showAlert('Cantidad inválida', 'Ingresá una cantidad mayor que cero.', 'warning');
-        return;
+function normalizarUnidadIngrediente(value) {
+    const unit = String(value || '').trim().toLocaleLowerCase('es');
+    if (!unit) return 'unidad';
+    if (/^(u|ud|uds|unidad|unidades)$/.test(unit)) return 'unidad';
+    if (/^(g|gr|grs|gramo|gramos)$/.test(unit)) return 'g';
+    if (/^(kg|kilo|kilos|kilogramo|kilogramos)$/.test(unit)) return 'kg';
+    if (/^(ml|cc|mililitro|mililitros)$/.test(unit)) return 'ml';
+    if (/^(l|lt|lts|litro|litros)$/.test(unit)) return 'l';
+    if (/^(taza|tazas)$/.test(unit)) return 'taza';
+    if (/^(cda|cdas|cucharada|cucharadas)$/.test(unit)) return 'cda';
+    if (/^(cdita|cditas|cucharadita|cucharaditas)$/.test(unit)) return 'cdita';
+    return 'unidad';
+}
+
+function interpretarLineaIngrediente(line) {
+    const cleanLine = String(line || '').trim().replace(/\s+/g, ' ');
+    if (!cleanLine) return null;
+
+    const prefixMatch = cleanLine.match(new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*(${INGREDIENT_UNIT_PATTERN})?\\s*(?:de\\s+)?(.+)$`, 'i'));
+    const suffixMatch = cleanLine.match(new RegExp(`^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(${INGREDIENT_UNIT_PATTERN})$`, 'i'));
+    let name = cleanLine;
+    let quantity = 1;
+    let unit = 'unidad';
+
+    if (prefixMatch) {
+        quantity = Number(prefixMatch[1].replace(',', '.'));
+        unit = normalizarUnidadIngrediente(prefixMatch[2]);
+        name = prefixMatch[3];
+    } else if (suffixMatch) {
+        name = suffixMatch[1];
+        quantity = Number(suffixMatch[2].replace(',', '.'));
+        unit = normalizarUnidadIngrediente(suffixMatch[3]);
     }
 
-    if (currentPlanState.pantry_limit !== null && userIngredients.length >= currentPlanState.pantry_limit) {
-        showAlert('Límite del plan Free', `Podés guardar hasta ${currentPlanState.pantry_limit} ingredientes.`, 'warning');
-        return;
+    name = name.trim().replace(/^de\s+/i, '').slice(0, 100);
+    if (!name || !Number.isFinite(quantity) || quantity <= 0 || quantity > 99999) {
+        return { error: true, original: cleanLine };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { error } = await supabase.from('pantry').insert([{
-        user_id: user.id,
-        ingredient: val,
-        quantity,
-        unit
-    }]);
-    if (!error) {
-        ingredientInput.value = '';
-        if (ingredientQuantityInput) ingredientQuantityInput.value = '1';
-        await loadPantry();
-        const ingredientId = await crearHuellaPrivada(val);
-        trackAnalyticsEvent('ingredient_added', {
-            ingredient_id: ingredientId,
-            ingredient_count: userIngredients.length,
-            quantity,
-            unit
-        });
-    } else {
-        trackTechnicalError('ingredient_add', error);
-        if (error.message?.includes('FREE_PANTRY_LIMIT')) {
-            showAlert('Límite del plan Free', 'Alcanzaste el máximo de 20 ingredientes.', 'warning');
+    return { name, quantity, unit };
+}
+
+function parsearCargaMasivaIngredientes(value) {
+    const decimalSafeText = String(value || '').replace(/(\d),(\d)/g, '$1.$2');
+    const lines = decimalSafeText.split(/[\n,;]+/).map(line => line.trim()).filter(Boolean);
+    const parsed = lines.map(interpretarLineaIngrediente).filter(Boolean);
+    const invalid = parsed.filter(item => item.error);
+    const consolidated = new Map();
+
+    parsed.filter(item => !item.error).forEach(item => {
+        const key = `${normalizarClaveCompra(item.name)}|${item.unit}`;
+        const current = consolidated.get(key);
+        if (current) {
+            current.quantity = redondearCantidadCompra(current.quantity + item.quantity);
+        } else {
+            consolidated.set(key, { ...item });
         }
+    });
+
+    const items = [...consolidated.values()];
+    items.forEach(item => {
+        if (item.quantity > 99999) invalid.push({ error: true, original: item.name });
+    });
+
+    return {
+        items: items.filter(item => item.quantity <= 99999),
+        invalid,
+        originalCount: lines.length
+    };
+}
+
+function renderIngredientBulkPreview() {
+    const preview = document.getElementById('ingredient-bulk-preview');
+    const label = document.getElementById('add-ingredients-label');
+    const parsed = parsearCargaMasivaIngredientes(ingredientInput.value);
+    const existingKeys = new Set(userIngredients.map(item =>
+        `${normalizarClaveCompra(item.ingredient)}|${normalizarUnidadIngrediente(item.unit)}`
+    ));
+
+    addIngredientBtn.disabled = parsed.items.length === 0 || parsed.invalid.length > 0;
+    label.textContent = parsed.items.length > 0
+        ? `Agregar ${parsed.items.length} ${parsed.items.length === 1 ? 'ingrediente' : 'ingredientes'}`
+        : 'Agregar ingredientes';
+
+    if (parsed.originalCount === 0) {
+        preview.innerHTML = '<span class="ingredient-preview-empty">La vista previa aparecerá acá.</span>';
+        return;
     }
+
+    const visibleItems = parsed.items.slice(0, 8);
+    preview.innerHTML = `
+        ${visibleItems.map(item => `
+            <span class="ingredient-preview-chip">
+                <strong>${formatearCantidad(item.quantity)} ${escaparHTML(item.unit)}</strong>
+                ${escaparHTML(item.name)}
+                ${existingKeys.has(`${normalizarClaveCompra(item.name)}|${item.unit}`) ? '<em>actualiza</em>' : ''}
+            </span>
+        `).join('')}
+        ${parsed.items.length > visibleItems.length ? `<span class="ingredient-preview-more">+${parsed.items.length - visibleItems.length} más</span>` : ''}
+        ${parsed.invalid.length > 0 ? '<span class="ingredient-preview-error">Revisá las cantidades marcadas.</span>' : ''}
+    `;
+}
+
+ingredientInput.addEventListener('input', renderIngredientBulkPreview);
+ingredientInput.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !addIngredientBtn.disabled) {
+        addIngredientBtn.click();
+    }
+});
+
+addIngredientBtn.addEventListener('click', async () => {
+    const parsed = parsearCargaMasivaIngredientes(ingredientInput.value);
+    if (parsed.items.length === 0 || parsed.invalid.length > 0) {
+        showAlert('Revisá la lista', 'Todas las cantidades deben ser mayores que cero.', 'warning');
+        return;
+    }
+
+    const existingKeys = new Set(userIngredients.map(item =>
+        `${normalizarClaveCompra(item.ingredient)}|${normalizarUnidadIngrediente(item.unit)}`
+    ));
+    const newIngredientCount = parsed.items.filter(item =>
+        !existingKeys.has(`${normalizarClaveCompra(item.name)}|${item.unit}`)
+    ).length;
+
+    if (
+        currentPlanState.pantry_limit !== null
+        && userIngredients.length + newIngredientCount > currentPlanState.pantry_limit
+    ) {
+        const availableSlots = Math.max(currentPlanState.pantry_limit - userIngredients.length, 0);
+        showAlert('Límite del plan Free', `Podés agregar ${availableSlots} ingredientes nuevos antes de alcanzar el límite de ${currentPlanState.pantry_limit}.`, 'warning');
+        return;
+    }
+
+    addIngredientBtn.disabled = true;
+    const { data, error } = await supabase.rpc('add_pantry_ingredients_bulk', {
+        p_items: parsed.items
+    });
+
+    if (error) {
+        trackTechnicalError('ingredients_bulk_add', error);
+        const message = error.message?.includes('FREE_PANTRY_LIMIT')
+            ? 'La carga supera el máximo de ingredientes de tu plan Free.'
+            : 'No se pudo guardar la lista. No se agregó ningún ingrediente.';
+        showAlert('Error', message, 'error');
+        renderIngredientBulkPreview();
+        return;
+    }
+
+    ingredientInput.value = '';
+    await loadPantry();
+    const metrics = await obtenerMetricasIngredientes(userIngredients);
+    trackAnalyticsEvent('ingredients_bulk_added', {
+        ...metrics,
+        submitted_count: parsed.items.length,
+        added_count: Number(data?.added_count) || 0,
+        updated_count: Number(data?.updated_count) || 0
+    });
+    showAlert(
+        'Alacena actualizada',
+        `${Number(data?.added_count) || 0} nuevos y ${Number(data?.updated_count) || 0} actualizados.`,
+        'success'
+    );
 });
 
 function renderIngredients() {
@@ -332,9 +454,9 @@ function renderIngredients() {
 
     ingredientsList.innerHTML = userIngredients.map(item => `
         <span class="ingredient-chip">
-            <strong>${formatearCantidad(item.quantity || 1)} ${item.unit || 'unidad'}</strong>
-            ${item.ingredient}
-            <button onclick="deleteIngredient('${item.id}')" class="chip-delete-btn">×</button>
+            <strong>${formatearCantidad(item.quantity || 1)} ${escaparHTML(item.unit || 'unidad')}</strong>
+            ${escaparHTML(item.ingredient)}
+            <button onclick="deleteIngredient('${escaparHTML(item.id)}')" class="chip-delete-btn">×</button>
         </span>
     `).join('');
 }
