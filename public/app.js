@@ -298,6 +298,11 @@ function aplicarEstadoPlan(planData) {
     if (savedPremiumTools) savedPremiumTools.classList.toggle('hidden', !isPremium);
     if (savedFreeUpsell) savedFreeUpsell.classList.toggle('hidden', isPremium);
     if (shoppingListShortcut) shoppingListShortcut.classList.toggle('hidden', !isPremium);
+    if (isPremium) {
+        void cargarBadgeCompras();
+    } else {
+        actualizarBadgeCompras(0);
+    }
     updatePlansView();
 
 }
@@ -2230,6 +2235,58 @@ const shoppingListState = {
 
 let shoppingListReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
 
+function actualizarBadgeCompras(pendingCount) {
+    const badge = document.getElementById('shopping-pending-badge');
+    const button = document.getElementById('open-main-shopping-list-btn');
+    const count = Math.max(Number(pendingCount) || 0, 0);
+    if (badge) {
+        badge.textContent = count > 99 ? '99+' : String(count);
+        badge.classList.toggle('hidden', count === 0);
+    }
+    if (button) {
+        button.setAttribute(
+            'aria-label',
+            count > 0
+                ? `Abrir mi lista de compras, ${count} ${count === 1 ? 'producto pendiente' : 'productos pendientes'}`
+                : 'Abrir mi lista de compras'
+        );
+    }
+}
+
+async function cargarBadgeCompras() {
+    if (currentPlanState.plan !== 'premium') {
+        actualizarBadgeCompras(0);
+        return;
+    }
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: list, error: listError } = await supabase
+            .from('shopping_lists')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('list_kind', 'personal')
+            .maybeSingle();
+        if (listError) throw listError;
+        if (!list) {
+            actualizarBadgeCompras(0);
+            return;
+        }
+
+        const { count, error: countError } = await supabase
+            .from('shopping_list_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('list_id', list.id)
+            .eq('is_checked', false);
+        if (countError) throw countError;
+        actualizarBadgeCompras(count || 0);
+    } catch (error) {
+        trackTechnicalError('shopping_badge_load', error);
+    }
+}
+
 function normalizarClaveCompra(value) {
     return String(value || '')
         .normalize('NFD')
@@ -2272,6 +2329,7 @@ function renderBudgetSummary() {
         return total + (hasActual ? Number(item.actual_cost) : (Number(item.estimated_cost) || 0));
     }, 0);
     const projected = shoppingListState.items.reduce((total, item) => {
+        if (!item.is_checked) return total + (Number(item.estimated_cost) || 0);
         const hasActual = item.actual_cost !== null && item.actual_cost !== undefined;
         return total + (hasActual ? Number(item.actual_cost) : (Number(item.estimated_cost) || 0));
     }, 0);
@@ -2279,7 +2337,7 @@ function renderBudgetSummary() {
 
     cards.innerHTML = `
         <div><span>Presupuesto</span><strong>${hasBudget ? formatearDinero(budget) : 'Sin definir'}</strong></div>
-        <div><span>Estimado</span><strong>${formatearDinero(estimated)}</strong></div>
+        <div><span>Proyección</span><strong>${formatearDinero(projected)}</strong></div>
         <div><span>Gastado</span><strong>${formatearDinero(spent)}</strong></div>
         <div class="${hasBudget && difference < 0 ? 'is-over-budget' : 'is-within-budget'}">
             <span>${hasBudget && difference < 0 ? 'Exceso' : 'Disponible'}</span>
@@ -2349,6 +2407,7 @@ function renderShoppingList() {
 
     const pending = shoppingListState.items.filter(item => !item.is_checked);
     const checked = shoppingListState.items.filter(item => item.is_checked);
+    actualizarBadgeCompras(pending.length);
     summary.innerHTML = `<strong>${pending.length}</strong> pendientes · <strong>${checked.length}</strong> comprados`;
     renderBudgetSummary();
 
@@ -2380,11 +2439,11 @@ function renderShoppingList() {
                     <button type="button" class="shopping-item-delete" aria-label="Eliminar producto">×</button>
                     <div class="shopping-item-costs">
                         <label>
-                            <span>Estimado total</span>
+                            <span>Costo estimado</span>
                             <input type="number" class="shopping-cost-input" data-cost-field="estimated_cost" min="0" max="999999999" step="0.01" value="${item.estimated_cost !== null && item.estimated_cost !== undefined ? Number(item.estimated_cost) : ''}" placeholder="0">
                         </label>
-                        <label>
-                            <span>Pagado total</span>
+                        <label class="shopping-actual-cost-field">
+                            <span>Precio pagado</span>
                             <input type="number" class="shopping-cost-input" data-cost-field="actual_cost" min="0" max="999999999" step="0.01" value="${item.actual_cost !== null && item.actual_cost !== undefined ? Number(item.actual_cost) : ''}" placeholder="0">
                         </label>
                     </div>
@@ -2515,6 +2574,7 @@ async function agregarFaltantesRecetaACompras(recipeTitle, rawItems) {
             item_count: addedCount,
             recipe_id: await obtenerIdReceta(recipeTitle)
         });
+        await cargarBadgeCompras();
         showAlert(
             addedCount > 0 ? 'Agregado a compras' : 'Ya estaba agregado',
             addedCount > 0

@@ -1728,6 +1728,25 @@ button[type="submit"]:hover {
   transform: scale(0.96);
 }
 
+.shopping-pending-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paprika);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.3);
+}
+
 /* Animación de entrada para tarjetas de recetas */
 .recipe-list > div {
   animation: slideUpCard 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -3023,6 +3042,14 @@ button[type="submit"]:hover {
   gap: 7px;
   padding-top: 8px;
   border-top: 1px solid rgba(251, 246, 236, 0.06);
+}
+
+.shopping-item:not(.is-checked) .shopping-item-costs {
+  grid-template-columns: 1fr;
+}
+
+.shopping-item:not(.is-checked) .shopping-actual-cost-field {
+  display: none;
 }
 
 .shopping-item .shopping-item-costs label {
