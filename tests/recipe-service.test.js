@@ -27,7 +27,7 @@ function createRecipe(index, type) {
 function createAiResponse(pantryCount, suggestionCount) {
     return JSON.stringify([
         ...Array.from({ length: pantryCount }, (_, index) => createRecipe(index + 1, 'alacena')),
-        ...Array.from({ length: suggestionCount }, (_, index) => createRecipe(index + 1, 'sugerencia'))
+        ...Array.from({ length: suggestionCount }, (_, index) => createRecipe(pantryCount + index + 1, 'sugerencia'))
     ]);
 }
 
@@ -144,4 +144,53 @@ test('el prompt no mezcla las cantidades de resultados entre planes', () => {
     assert.match(premiumPrompt, /genera exactamente 10 recetas/);
     assert.match(premiumPrompt, /- 7 recetas de tipo "alacena"/);
     assert.match(premiumPrompt, /- 3 recetas de tipo "sugerencia"/);
+});
+
+test('rechaza recetas repetidas dentro de una misma generación', () => {
+    const repeated = createRecipe(1, 'alacena');
+    const response = JSON.stringify([
+        repeated,
+        { ...createRecipe(2, 'alacena'), title: repeated.title },
+        createRecipe(3, 'sugerencia')
+    ]);
+
+    const recipes = _testing.parsearYSeleccionarRecetas(response, 2, 1);
+    assert.equal(recipes, null);
+});
+
+test('detecta títulos que son reformulaciones del mismo plato', () => {
+    assert.equal(_testing.sonTitulosSimilares('Tortilla rápida de papas', 'Tortilla de papa casera'), true);
+    assert.equal(_testing.sonTitulosSimilares('Sopa de zapallo', 'Arroz salteado con verduras'), false);
+});
+
+test('evita recetas recientes cuando los ingredientes son parecidos', () => {
+    const history = [
+        { title: 'Tortilla de papas', input_ingredients: ['papa', 'huevo', 'cebolla'] },
+        { title: 'Sopa de calabaza', input_ingredients: ['calabaza', 'crema'] }
+    ];
+    const currentIngredients = [
+        { name: 'papa' },
+        { name: 'huevo' },
+        { name: 'queso' }
+    ];
+
+    assert.deepEqual(
+        _testing.seleccionarTitulosRecientes(history, currentIngredients, 20),
+        ['Tortilla de papas']
+    );
+});
+
+test('el prompt prohíbe repetir recetas recientes y exige variedad real', () => {
+    const prompt = _testing.crearPrompt(
+        [{ name: 'papa', quantity: 2, unit: 'unidad' }],
+        2,
+        1,
+        {},
+        ['Tortilla de papas']
+    );
+
+    assert.match(prompt, /NO debes repetir/);
+    assert.match(prompt, /Tortilla de papas/);
+    assert.match(prompt, /identidad culinaria realmente distinta/);
+    assert.match(prompt, /mayor variedad posible/);
 });
