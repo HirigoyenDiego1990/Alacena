@@ -1305,6 +1305,7 @@ document.getElementById('premium-payment-form').addEventListener('submit', async
 let isAppAdmin = false;
 let adminRequests = [];
 let adminPaymentHistory = [];
+let adminPremiumCustomers = [];
 let adminStatusFilter = 'open';
 let adminReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
 let lastKnownAdminOpenCount = null;
@@ -1342,7 +1343,7 @@ function adminStatusLabel(status) {
 
 function updateAdminSummary() {
     const openCount = adminRequests.filter(request => ['pending', 'contacted'].includes(request.status)).length;
-    const approvedCount = adminRequests.filter(request => request.status === 'approved').length;
+    const approvedCount = adminPremiumCustomers.length;
     const badge = document.getElementById('admin-pending-badge');
 
     document.getElementById('admin-pending-count').textContent = openCount;
@@ -1354,6 +1355,40 @@ function updateAdminSummary() {
 
 function renderAdminRequests() {
     const list = document.getElementById('admin-requests-list');
+    if (adminStatusFilter === 'customers') {
+        updateAdminSummary();
+        if (adminPremiumCustomers.length === 0) {
+            list.innerHTML = '<p class="admin-empty-state">No hay clientes Premium activos.</p>';
+            return;
+        }
+
+        list.innerHTML = adminPremiumCustomers.map(customer => {
+            const daysRemaining = Number(customer.days_remaining);
+            const isExpiring = !customer.is_permanent && Number.isFinite(daysRemaining) && daysRemaining <= 7;
+            const expiryText = customer.is_permanent
+                ? 'Permanente'
+                : `${formatAdminDate(customer.current_period_end)}${isExpiring ? ` · ${daysRemaining} ${daysRemaining === 1 ? 'día' : 'días'}` : ''}`;
+            return `
+                <article class="admin-request-card admin-request-card--customer ${isExpiring ? 'is-expiring' : ''}">
+                    <div class="admin-request-heading">
+                        <div>
+                            <h3>${escapeAdminText(customer.payer_name || 'Cliente Premium')}</h3>
+                            <p>${escapeAdminText(customer.contact_email || 'Sin correo informado')}</p>
+                        </div>
+                        <span class="admin-status-badge" data-status="approved">Activo</span>
+                    </div>
+                    <div class="admin-request-details">
+                        <div class="admin-request-detail-wide"><span>Vigencia</span><strong class="${isExpiring ? 'admin-customer-expiry' : ''}">${escapeAdminText(expiryText)}</strong></div>
+                        <div><span>Pagos registrados</span><strong>${escapeAdminText(customer.approved_payments || 0)}</strong></div>
+                        <div><span>Total registrado</span><strong>${escapeAdminText(formatPremiumPrice(customer.total_paid_ars || 0, 'ARS'))}</strong></div>
+                        <div class="admin-request-detail-wide"><span>Última actualización</span><strong>${escapeAdminText(formatAdminDate(customer.last_payment_at || customer.entitlement_updated_at))}</strong></div>
+                    </div>
+                </article>
+            `;
+        }).join('');
+        return;
+    }
+
     if (adminStatusFilter === 'history') {
         updateAdminSummary();
         if (adminPaymentHistory.length === 0) {
@@ -1446,9 +1481,10 @@ async function loadAdminRequests({ announce = false } = {}) {
         list.innerHTML = '<p class="admin-empty-state">Actualizando solicitudes…</p>';
     }
 
-    const [requestsResult, historyResult] = await Promise.all([
+    const [requestsResult, historyResult, customersResult] = await Promise.all([
         supabase.rpc('list_premium_upgrade_requests'),
-        supabase.rpc('list_premium_payment_history')
+        supabase.rpc('list_premium_payment_history'),
+        supabase.rpc('list_active_premium_customers')
     ]);
     const { data, error } = requestsResult;
     if (error) {
@@ -1465,6 +1501,12 @@ async function loadAdminRequests({ announce = false } = {}) {
         adminPaymentHistory = [];
     } else {
         adminPaymentHistory = Array.isArray(historyResult.data) ? historyResult.data : [];
+    }
+    if (customersResult.error) {
+        trackTechnicalError('admin_premium_customers_load', customersResult.error);
+        adminPremiumCustomers = [];
+    } else {
+        adminPremiumCustomers = Array.isArray(customersResult.data) ? customersResult.data : [];
     }
     const openCount = adminRequests.filter(request => ['pending', 'contacted'].includes(request.status)).length;
     if (announce) {

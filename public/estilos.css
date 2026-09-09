@@ -1272,6 +1272,7 @@ button[type="submit"]:hover {
 
 .admin-filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   margin-bottom: 12px;
 }
@@ -1307,6 +1308,15 @@ button[type="submit"]:hover {
 
 .admin-request-card--history {
   border-color: rgba(124, 148, 115, 0.16);
+}
+
+.admin-request-card--customer.is-expiring {
+  border-color: rgba(232, 163, 61, 0.42);
+  background: rgba(232, 163, 61, 0.07);
+}
+
+.admin-customer-expiry {
+  color: var(--saffron) !important;
 }
 
 @media (max-width: 430px) {
