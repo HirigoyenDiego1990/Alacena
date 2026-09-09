@@ -101,13 +101,35 @@ declare
     v_account_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
     v_payer_name text := trim(p_payer_name);
     v_reference text := nullif(trim(p_payment_reference), '');
+    v_entitlement_plan text;
+    v_entitlement_status text;
+    v_period_end timestamptz;
+    v_existing_status text;
+    v_existing_reported_at timestamptz;
 begin
     if v_user_id is null then
         raise exception 'AUTH_REQUIRED';
     end if;
 
-    if public.get_effective_plan(v_user_id) = 'premium' then
+    select plan, status, current_period_end
+    into v_entitlement_plan, v_entitlement_status, v_period_end
+    from public.user_entitlements
+    where user_id = v_user_id;
+
+    -- Una cuenta Premium sin vencimiento es permanente y no necesita renovar.
+    if v_entitlement_plan = 'premium'
+        and v_entitlement_status = 'active'
+        and v_period_end is null then
         return jsonb_build_object('status', 'already_premium');
+    end if;
+
+    -- Las cuentas temporales pueden renovar durante sus últimos siete días.
+    if public.get_effective_plan(v_user_id) = 'premium'
+        and v_period_end > now() + interval '7 days' then
+        return jsonb_build_object(
+            'status', 'renewal_not_available',
+            'current_period_end', v_period_end
+        );
     end if;
 
     if char_length(v_email) not between 3 and 254 or position('@' in v_email) <= 1 then
@@ -124,6 +146,18 @@ begin
 
     if v_reference is not null and char_length(v_reference) > 120 then
         raise exception 'INVALID_PAYMENT_REFERENCE';
+    end if;
+
+    select status, payment_reported_at
+    into v_existing_status, v_existing_reported_at
+    from public.premium_upgrade_requests
+    where user_id = v_user_id;
+
+    if v_existing_status in ('pending', 'contacted') and v_existing_reported_at is not null then
+        return jsonb_build_object(
+            'status', 'already_pending',
+            'payment_reported_at', v_existing_reported_at
+        );
     end if;
 
     insert into public.premium_upgrade_requests (

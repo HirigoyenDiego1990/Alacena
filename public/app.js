@@ -26,7 +26,8 @@ let currentPlanState = {
     pantry_limit: 20,
     saved_recipe_limit: 10,
     alacena_results: 2,
-    suggestion_results: 1
+    suggestion_results: 1,
+    current_period_end: null
 };
 
 function crearIdAnonimo() {
@@ -263,7 +264,19 @@ function aplicarEstadoPlan(planData) {
     const savedFreeUpsell = document.getElementById('saved-free-upsell');
 
     if (badge) {
-        badge.textContent = isPremium ? 'Premium' : 'Free';
+        const periodInfo = getPremiumPeriodInfo();
+        if (periodInfo.canRenew && isPremium) {
+            badge.textContent = periodInfo.daysRemaining <= 1
+                ? 'Premium · vence pronto'
+                : `Premium · ${periodInfo.daysRemaining} días`;
+            badge.title = 'Tu Premium está por vencer. Tocá para renovarlo.';
+        } else if (periodInfo.isExpired) {
+            badge.textContent = 'Renovar Premium';
+            badge.title = 'Tu Premium venció. Tocá para renovarlo.';
+        } else {
+            badge.textContent = isPremium ? 'Premium' : 'Free';
+            badge.title = 'Ver planes';
+        }
         badge.classList.toggle('plan-badge--free', !isPremium);
         badge.classList.toggle('plan-badge--premium', isPremium);
     }
@@ -926,6 +939,7 @@ function obtenerVistaActualParaVolver() {
 
 function updatePlansView() {
     const isPremium = currentPlanState.plan === 'premium';
+    const periodInfo = getPremiumPeriodInfo();
     const used = Math.max(Number(currentPlanState.generation_used) || 0, 0);
     const limit = Math.max(Number(currentPlanState.generation_limit) || 1, 1);
     const usagePercent = Math.min((used / limit) * 100, 100);
@@ -937,8 +951,22 @@ function updatePlansView() {
     const freeCard = document.getElementById('free-plan-card');
     const premiumCard = document.getElementById('premium-plan-card');
     const requestButton = document.getElementById('request-premium-btn');
+    const renewalNotice = document.getElementById('premium-renewal-notice');
+    const renewalTitle = document.getElementById('premium-renewal-title');
+    const renewalText = document.getElementById('premium-renewal-text');
 
-    if (currentBadge) currentBadge.textContent = `Tu plan actual: ${isPremium ? 'Premium' : 'Free'}`;
+    if (currentBadge) {
+        if (!isPremium) {
+            currentBadge.textContent = periodInfo.isExpired
+                ? `Premium vencido el ${formatPremiumPeriodDate(periodInfo.periodEnd)}`
+                : 'Tu plan actual: Free';
+        } else if (currentPlanState.current_period_end) {
+            const periodEnd = formatPremiumPeriodDate(periodInfo.periodEnd);
+            currentBadge.textContent = `Premium hasta el ${periodEnd}`;
+        } else {
+            currentBadge.textContent = 'Tu plan actual: Premium permanente';
+        }
+    }
     if (usageText) usageText.textContent = `${used} de ${limit} usadas`;
     if (usageFill) usageFill.style.width = `${usagePercent}%`;
     if (resultsText) {
@@ -948,9 +976,29 @@ function updatePlansView() {
     freeCard?.classList.toggle('is-current', !isPremium);
     premiumCard?.classList.toggle('is-current', isPremium);
 
-    if (requestButton && isPremium) {
+    const showRenewalNotice = periodInfo.canRenew;
+    renewalNotice?.classList.toggle('hidden', !showRenewalNotice);
+    if (showRenewalNotice && renewalTitle && renewalText) {
+        if (periodInfo.isExpired) {
+            renewalTitle.textContent = 'Tu Premium venció';
+            renewalText.textContent = `Venció el ${formatPremiumPeriodDate(periodInfo.periodEnd)}. Podés renovarlo por otros 30 días.`;
+        } else {
+            renewalTitle.textContent = periodInfo.daysRemaining <= 1
+                ? 'Tu Premium vence pronto'
+                : `A tu Premium le quedan ${periodInfo.daysRemaining} días`;
+            renewalText.textContent = `Está activo hasta el ${formatPremiumPeriodDate(periodInfo.periodEnd)}. Ya podés renovarlo.`;
+        }
+    }
+
+    if (requestButton && periodInfo.isPermanent) {
         requestButton.disabled = true;
         requestButton.textContent = 'Tu plan Premium está activo';
+    } else if (requestButton && isPremium && !periodInfo.canRenew) {
+        requestButton.disabled = true;
+        requestButton.textContent = `Renovación disponible 7 días antes`;
+    } else if (requestButton && periodInfo.canRenew) {
+        requestButton.disabled = false;
+        requestButton.textContent = 'Renovar Premium';
     } else if (requestButton) {
         requestButton.disabled = false;
         requestButton.textContent = 'Quiero ser Premium';
@@ -961,7 +1009,9 @@ async function loadPremiumRequestStatus() {
     updatePlansView();
     const statusText = document.getElementById('premium-request-status');
     const requestButton = document.getElementById('request-premium-btn');
-    if (currentPlanState.plan === 'premium') {
+    const periodInfo = getPremiumPeriodInfo();
+    if (periodInfo.isPermanent) {
+        premiumRequestState = null;
         statusText.textContent = 'Todas las funciones están desbloqueadas en esta cuenta.';
         return;
     }
@@ -980,16 +1030,22 @@ async function loadPremiumRequestStatus() {
         return;
     }
 
+    premiumRequestState = data || null;
+
     if (data?.status === 'pending' || data?.status === 'contacted') {
         requestButton.disabled = false;
         requestButton.textContent = 'Ver instrucciones de pago';
         statusText.textContent = data?.payment_reported_at
-            ? 'Recibimos tu aviso de pago. La activación está pendiente de revisión.'
+            ? `Recibimos tu aviso de pago. La ${currentPlanState.plan === 'premium' ? 'renovación' : 'activación'} está pendiente de revisión.`
             : 'Ya registraste tu interés. Podés continuar con la transferencia.';
-    } else if (data?.status === 'approved') {
+    } else if (data?.status === 'approved' && currentPlanState.plan !== 'premium') {
         requestButton.disabled = true;
         requestButton.textContent = 'Solicitud aprobada';
         statusText.textContent = 'El acceso fue aprobado. Volvé a entrar si el plan todavía figura como Free.';
+    } else if (currentPlanState.plan === 'premium' && !periodInfo.canRenew) {
+        statusText.textContent = `Podrás renovarlo durante los últimos ${PREMIUM_RENEWAL_WINDOW_DAYS} días de vigencia.`;
+    } else if (periodInfo.canRenew) {
+        statusText.textContent = 'Podés renovar ahora y los 30 días se sumarán a tu vigencia actual.';
     } else if (data?.status === 'rejected' || data?.status === 'cancelled') {
         statusText.textContent = 'Podés enviar una nueva solicitud cuando quieras.';
     } else {
@@ -1035,6 +1091,39 @@ document.getElementById('back-from-plans-btn').addEventListener('click', () => {
 });
 
 let premiumPaymentConfig = null;
+let premiumRequestState = null;
+const PREMIUM_RENEWAL_WINDOW_DAYS = 7;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function getPremiumPeriodInfo() {
+    const periodEnd = currentPlanState.current_period_end
+        ? new Date(currentPlanState.current_period_end)
+        : null;
+    const hasValidEnd = periodEnd && !Number.isNaN(periodEnd.getTime());
+    const isPremium = currentPlanState.plan === 'premium';
+    const daysRemaining = hasValidEnd
+        ? Math.max(Math.ceil((periodEnd.getTime() - Date.now()) / DAY_IN_MS), 0)
+        : null;
+
+    return {
+        periodEnd: hasValidEnd ? periodEnd : null,
+        isPermanent: isPremium && !hasValidEnd,
+        isExpired: !isPremium && hasValidEnd && periodEnd.getTime() <= Date.now(),
+        daysRemaining,
+        canRenew: Boolean(hasValidEnd && (
+            (!isPremium && periodEnd.getTime() <= Date.now())
+            || (isPremium && daysRemaining <= PREMIUM_RENEWAL_WINDOW_DAYS)
+        ))
+    };
+}
+
+function formatPremiumPeriodDate(value) {
+    return new Intl.DateTimeFormat('es-AR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    }).format(value);
+}
 
 function formatPremiumPrice(amount, currency) {
     const numericAmount = Number(amount);
@@ -1048,6 +1137,8 @@ function formatPremiumPrice(amount, currency) {
 }
 
 async function loadPremiumPaymentScreen() {
+    const periodInfo = getPremiumPeriodInfo();
+    const isRenewal = periodInfo.canRenew;
     const price = document.getElementById('premium-payment-price');
     const duration = document.getElementById('premium-payment-duration');
     const provider = document.getElementById('premium-payment-provider');
@@ -1059,6 +1150,9 @@ async function loadPremiumPaymentScreen() {
     const unavailable = document.getElementById('premium-payment-unavailable');
     const submitButton = document.getElementById('submit-premium-payment-btn');
     const emailInput = document.getElementById('premium-contact-email');
+    const paymentTitle = document.getElementById('premium-payment-title');
+    const paymentIntro = document.getElementById('premium-payment-intro');
+    const formStatus = document.getElementById('premium-payment-form-status');
 
     try {
         const response = await fetch('/api/premium-payment-config');
@@ -1079,20 +1173,36 @@ async function loadPremiumPaymentScreen() {
     accountIdRow.classList.toggle('hidden', !premiumPaymentConfig?.accountId);
     accountList.classList.toggle('hidden', !isConfigured);
     unavailable.classList.toggle('hidden', isConfigured);
-    submitButton.disabled = !isConfigured;
+    const hasReportedPayment = ['pending', 'contacted'].includes(premiumRequestState?.status)
+        && Boolean(premiumRequestState?.payment_reported_at);
+    submitButton.disabled = !isConfigured || hasReportedPayment;
+    submitButton.textContent = hasReportedPayment
+        ? 'Aviso de pago enviado'
+        : (isRenewal ? 'Enviar aviso de renovación' : 'Enviar aviso de pago');
+    formStatus.textContent = hasReportedPayment
+        ? 'Tu aviso ya está pendiente de revisión. No necesitás enviarlo otra vez.'
+        : '';
+    paymentTitle.textContent = isRenewal ? 'Renová tu Premium' : 'Estás a un paso de Premium';
+    paymentIntro.textContent = isRenewal
+        ? 'Transferí usando los datos de abajo y avisame desde este formulario. Al aprobarlo, se sumarán 30 días a tu vigencia.'
+        : 'Transferí usando los datos de abajo y después avisame desde este formulario. Revisaré el pago antes de activar tu cuenta.';
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.email) emailInput.value = user.email;
 }
 
 async function openPremiumPayment() {
-    if (currentPlanState.plan === 'premium') return;
+    const periodInfo = getPremiumPeriodInfo();
+    if (periodInfo.isPermanent || (currentPlanState.plan === 'premium' && !periodInfo.canRenew)) return;
     mostrarSubVista(viewPremiumPayment, null, 'premium_payment');
-    trackAnalyticsEvent('premium_payment_instructions_opened');
+    trackAnalyticsEvent('premium_payment_instructions_opened', {
+        payment_purpose: periodInfo.canRenew ? 'renewal' : 'activation'
+    });
     await loadPremiumPaymentScreen();
 }
 
 document.getElementById('request-premium-btn').addEventListener('click', openPremiumPayment);
+document.getElementById('premium-renewal-btn').addEventListener('click', openPremiumPayment);
 
 document.getElementById('back-from-premium-payment-btn').addEventListener('click', async () => {
     mostrarSubVista(viewPlans, null, 'plans');
@@ -1121,7 +1231,9 @@ document.getElementById('premium-payment-details').addEventListener('click', asy
 
 document.getElementById('premium-payment-form').addEventListener('submit', async event => {
     event.preventDefault();
-    if (!premiumPaymentConfig?.configured || currentPlanState.plan === 'premium') return;
+    const periodInfo = getPremiumPeriodInfo();
+    if (!premiumPaymentConfig?.configured || periodInfo.isPermanent || (currentPlanState.plan === 'premium' && !periodInfo.canRenew)) return;
+    if (['pending', 'contacted'].includes(premiumRequestState?.status) && premiumRequestState?.payment_reported_at) return;
 
     const submitButton = document.getElementById('submit-premium-payment-btn');
     const statusText = document.getElementById('premium-payment-form-status');
@@ -1147,17 +1259,34 @@ document.getElementById('premium-payment-form').addEventListener('submit', async
         return;
     }
 
+    if (data?.status === 'renewal_not_available') {
+        statusText.textContent = 'La renovación estará disponible durante los últimos 7 días de vigencia.';
+        return;
+    }
+
+    if (data?.status === 'already_pending') {
+        premiumRequestState = { ...premiumRequestState, status: 'pending', payment_reported_at: data.payment_reported_at };
+        statusText.textContent = 'Tu aviso de pago ya está pendiente de revisión.';
+        return;
+    }
+
     trackAnalyticsEvent('premium_payment_reported', {
-        request_status: data?.status || 'pending'
+        request_status: data?.status || 'pending',
+        payment_purpose: periodInfo.canRenew ? 'renewal' : 'activation'
     });
-    statusText.textContent = 'Aviso recibido. Revisaremos la transferencia antes de activar Premium.';
-    showAlert('¡Aviso recibido!', 'La activación quedará pendiente de revisión manual.', 'success');
+    premiumRequestState = { status: 'pending', payment_reported_at: data?.payment_reported_at };
+    const actionName = periodInfo.canRenew ? 'renovación' : 'activación';
+    statusText.textContent = `Aviso recibido. Revisaremos la transferencia antes de confirmar la ${actionName}.`;
+    showAlert('¡Aviso recibido!', `La ${actionName} quedó pendiente de revisión manual.`, 'success');
 });
 
 let isAppAdmin = false;
 let adminRequests = [];
 let adminStatusFilter = 'open';
 let adminReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
+let lastKnownAdminOpenCount = null;
+let adminRefreshTimer = null;
+const ADMIN_REQUEST_REFRESH_MS = 60 * 1000;
 
 function escapeAdminText(value) {
     return String(value ?? '')
@@ -1225,6 +1354,9 @@ function renderAdminRequests() {
                 <div class="admin-request-details">
                     <div><span>Referencia</span><strong>${escapeAdminText(request.payment_reference || 'No informada')}</strong></div>
                     <div><span>Aviso recibido</span><strong>${escapeAdminText(formatAdminDate(request.payment_reported_at || request.requested_at))}</strong></div>
+                    ${request.current_period_end || request.status === 'approved' ? `
+                        <div class="admin-request-detail-wide"><span>${request.status === 'approved' ? 'Premium vigente hasta' : 'Renovación del Premium vigente hasta'}</span><strong>${escapeAdminText(request.current_period_end ? formatAdminDate(request.current_period_end) : 'Permanente')}</strong></div>
+                    ` : ''}
                 </div>
                 ${isOpen ? `
                     <div class="admin-request-actions">
@@ -1238,7 +1370,22 @@ function renderAdminRequests() {
     }).join('');
 }
 
-async function loadAdminRequests() {
+function announceNewAdminRequests(openCount) {
+    const hasNewRequests = openCount > 0
+        && (lastKnownAdminOpenCount === null || openCount > lastKnownAdminOpenCount);
+    const adminViewIsClosed = viewAdmin.classList.contains('hidden');
+
+    if (hasNewRequests && adminViewIsClosed) {
+        showAlert(
+            openCount === 1 ? 'Nuevo pago por revisar' : `${openCount} pagos por revisar`,
+            'Abrí el panel del escudo para verificar la transferencia.',
+            'info'
+        );
+    }
+    lastKnownAdminOpenCount = openCount;
+}
+
+async function loadAdminRequests({ announce = false } = {}) {
     if (!isAppAdmin) return;
     const list = document.getElementById('admin-requests-list');
     if (!viewAdmin.classList.contains('hidden')) {
@@ -1255,7 +1402,22 @@ async function loadAdminRequests() {
     }
 
     adminRequests = Array.isArray(data) ? data : [];
+    const openCount = adminRequests.filter(request => ['pending', 'contacted'].includes(request.status)).length;
+    if (announce) {
+        announceNewAdminRequests(openCount);
+    } else {
+        lastKnownAdminOpenCount = openCount;
+    }
     renderAdminRequests();
+}
+
+function startAdminRequestMonitoring() {
+    if (adminRefreshTimer) window.clearInterval(adminRefreshTimer);
+    adminRefreshTimer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            void loadAdminRequests({ announce: true });
+        }
+    }, ADMIN_REQUEST_REFRESH_MS);
 }
 
 async function loadAdminAccess() {
@@ -1263,7 +1425,10 @@ async function loadAdminAccess() {
     const { data, error } = await supabase.rpc('is_app_admin');
     isAppAdmin = !error && data === true;
     adminButton.classList.toggle('hidden', !isAppAdmin);
-    if (isAppAdmin) await loadAdminRequests();
+    if (isAppAdmin) {
+        await loadAdminRequests({ announce: true });
+        startAdminRequestMonitoring();
+    }
 }
 
 document.getElementById('admin-panel-btn').addEventListener('click', async () => {
@@ -1277,7 +1442,13 @@ document.getElementById('back-from-admin-btn').addEventListener('click', () => {
     mostrarSubVista(adminReturnState.view, adminReturnState.tab, adminReturnState.screen);
 });
 
-document.getElementById('refresh-admin-requests-btn').addEventListener('click', loadAdminRequests);
+document.getElementById('refresh-admin-requests-btn').addEventListener('click', () => loadAdminRequests());
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isAppAdmin) {
+        void loadAdminRequests({ announce: true });
+    }
+});
 
 document.querySelector('.admin-filter-row').addEventListener('click', event => {
     const button = event.target.closest('.admin-filter-btn');

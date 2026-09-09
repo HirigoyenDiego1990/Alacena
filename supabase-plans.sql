@@ -79,6 +79,7 @@ declare
     v_plan text;
     v_generation_limit integer;
     v_generation_used integer;
+    v_current_period_end timestamptz;
     v_usage_date date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
 begin
     if v_user_id is null then
@@ -87,6 +88,15 @@ begin
 
     v_plan := public.get_effective_plan(v_user_id);
     v_generation_limit := case when v_plan = 'premium' then 50 else 3 end;
+
+    -- Conservamos la última fecha aunque ya haya vencido para poder mostrar
+    -- el aviso de renovación en la cuenta que volvió automáticamente a Free.
+    select current_period_end
+    into v_current_period_end
+    from public.user_entitlements
+    where user_id = v_user_id
+      and plan = 'premium'
+      and status = 'active';
 
     select coalesce(usage_count, 0)
     into v_generation_used
@@ -99,6 +109,7 @@ begin
 
     return jsonb_build_object(
         'plan', v_plan,
+        'current_period_end', v_current_period_end,
         'generation_limit', v_generation_limit,
         'generation_used', v_generation_used,
         'generation_remaining', greatest(v_generation_limit - v_generation_used, 0),

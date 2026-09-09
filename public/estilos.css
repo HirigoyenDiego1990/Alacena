@@ -819,6 +819,46 @@ button[type="submit"]:hover {
   font-size: 8.5px;
 }
 
+.premium-renewal-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(232, 163, 61, 0.34);
+  border-radius: 13px;
+  background: rgba(232, 163, 61, 0.09);
+}
+
+.premium-renewal-notice.hidden {
+  display: none;
+}
+
+.premium-renewal-notice strong {
+  color: var(--cream-text);
+  font-size: 10.5px;
+}
+
+.premium-renewal-notice p {
+  margin: 4px 0 0;
+  color: rgba(243, 239, 226, 0.55);
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+
+.premium-renewal-notice button {
+  flex: 0 0 auto;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--saffron);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .plans-comparison {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1335,6 +1375,10 @@ button[type="submit"]:hover {
   word-break: break-word;
 }
 
+.admin-request-details .admin-request-detail-wide {
+  grid-column: 1 / -1;
+}
+
 .admin-request-actions {
   display: grid;
   grid-template-columns: 1fr 1fr 1.25fr;
@@ -1375,6 +1419,11 @@ button[type="submit"]:hover {
 @media (max-width: 520px) {
   .plans-comparison {
     grid-template-columns: 1fr;
+  }
+
+  .premium-renewal-notice {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

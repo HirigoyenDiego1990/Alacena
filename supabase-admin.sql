@@ -27,6 +27,8 @@ $$;
 revoke all on function public.is_app_admin() from public, anon, authenticated;
 grant execute on function public.is_app_admin() to authenticated;
 
+drop function if exists public.list_premium_upgrade_requests();
+
 create or replace function public.list_premium_upgrade_requests()
 returns table (
     user_id uuid,
@@ -36,7 +38,8 @@ returns table (
     status text,
     requested_at timestamptz,
     payment_reported_at timestamptz,
-    updated_at timestamptz
+    updated_at timestamptz,
+    current_period_end timestamptz
 )
 language plpgsql
 stable
@@ -57,8 +60,13 @@ begin
         request.status,
         request.requested_at,
         request.payment_reported_at,
-        request.updated_at
+        request.updated_at,
+        entitlement.current_period_end
     from public.premium_upgrade_requests as request
+    left join public.user_entitlements as entitlement
+        on entitlement.user_id = request.user_id
+       and entitlement.plan = 'premium'
+       and entitlement.status = 'active'
     order by
         case when request.status in ('pending', 'contacted') then 0 else 1 end,
         request.payment_reported_at desc nulls last,
