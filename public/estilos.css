@@ -1245,7 +1245,7 @@ button[type="submit"]:hover {
 
 .admin-summary-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin: 13px 0;
 }
@@ -1303,6 +1303,16 @@ button[type="submit"]:hover {
   border: 1px solid rgba(251, 246, 236, 0.09);
   border-radius: 14px;
   background: rgba(251, 246, 236, 0.035);
+}
+
+.admin-request-card--history {
+  border-color: rgba(124, 148, 115, 0.16);
+}
+
+@media (max-width: 430px) {
+  .admin-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-request-heading {

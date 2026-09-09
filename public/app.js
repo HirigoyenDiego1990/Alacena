@@ -1304,6 +1304,7 @@ document.getElementById('premium-payment-form').addEventListener('submit', async
 
 let isAppAdmin = false;
 let adminRequests = [];
+let adminPaymentHistory = [];
 let adminStatusFilter = 'open';
 let adminReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
 let lastKnownAdminOpenCount = null;
@@ -1346,12 +1347,43 @@ function updateAdminSummary() {
 
     document.getElementById('admin-pending-count').textContent = openCount;
     document.getElementById('admin-approved-count').textContent = approvedCount;
+    document.getElementById('admin-history-count').textContent = adminPaymentHistory.length;
     badge.textContent = openCount > 99 ? '99+' : openCount;
     badge.classList.toggle('hidden', openCount === 0);
 }
 
 function renderAdminRequests() {
     const list = document.getElementById('admin-requests-list');
+    if (adminStatusFilter === 'history') {
+        updateAdminSummary();
+        if (adminPaymentHistory.length === 0) {
+            list.innerHTML = '<p class="admin-empty-state">El historial comenzará con la próxima solicitud que apruebes o rechaces.</p>';
+            return;
+        }
+
+        list.innerHTML = adminPaymentHistory.map(entry => `
+            <article class="admin-request-card admin-request-card--history">
+                <div class="admin-request-heading">
+                    <div>
+                        <h3>${escapeAdminText(entry.payer_name || 'Sin nombre informado')}</h3>
+                        <p>${escapeAdminText(entry.contact_email || 'Sin correo informado')}</p>
+                    </div>
+                    <span class="admin-status-badge" data-status="${escapeAdminText(entry.decision)}">${entry.decision === 'approved' ? 'Aprobado' : 'Rechazado'}</span>
+                </div>
+                <div class="admin-request-details">
+                    <div><span>Tipo</span><strong>${entry.request_type === 'renewal' ? 'Renovación' : 'Alta inicial'}</strong></div>
+                    <div><span>Importe</span><strong>${escapeAdminText(formatPremiumPrice(entry.amount_ars, 'ARS'))}</strong></div>
+                    <div><span>Referencia</span><strong>${escapeAdminText(entry.payment_reference || 'No informada')}</strong></div>
+                    <div><span>Revisado</span><strong>${escapeAdminText(formatAdminDate(entry.reviewed_at))}</strong></div>
+                    ${entry.decision === 'approved' ? `
+                        <div class="admin-request-detail-wide"><span>Premium vigente hasta</span><strong>${escapeAdminText(entry.premium_until ? formatAdminDate(entry.premium_until) : 'Permanente')}</strong></div>
+                    ` : ''}
+                </div>
+            </article>
+        `).join('');
+        return;
+    }
+
     const visibleRequests = adminStatusFilter === 'all'
         ? adminRequests
         : adminRequests.filter(request => ['pending', 'contacted'].includes(request.status));
@@ -1414,7 +1446,11 @@ async function loadAdminRequests({ announce = false } = {}) {
         list.innerHTML = '<p class="admin-empty-state">Actualizando solicitudes…</p>';
     }
 
-    const { data, error } = await supabase.rpc('list_premium_upgrade_requests');
+    const [requestsResult, historyResult] = await Promise.all([
+        supabase.rpc('list_premium_upgrade_requests'),
+        supabase.rpc('list_premium_payment_history')
+    ]);
+    const { data, error } = requestsResult;
     if (error) {
         trackTechnicalError('admin_requests_load', error);
         if (!viewAdmin.classList.contains('hidden')) {
@@ -1424,6 +1460,12 @@ async function loadAdminRequests({ announce = false } = {}) {
     }
 
     adminRequests = Array.isArray(data) ? data : [];
+    if (historyResult.error) {
+        trackTechnicalError('admin_payment_history_load', historyResult.error);
+        adminPaymentHistory = [];
+    } else {
+        adminPaymentHistory = Array.isArray(historyResult.data) ? historyResult.data : [];
+    }
     const openCount = adminRequests.filter(request => ['pending', 'contacted'].includes(request.status)).length;
     if (announce) {
         announceNewAdminRequests(openCount);
