@@ -1696,28 +1696,36 @@ button[type="submit"]:hover {
   opacity: 0.62;
 }
 
-.shopping-topbar-btn {
+.shopping-floating-btn {
+  position: fixed;
+  top: 82px;
+  right: max(16px, calc((100vw - 480px) / 2 + 16px));
+  z-index: 19;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   place-items: center;
-  border: 1px solid rgba(124, 148, 115, 0.38);
+  border: 1px solid rgba(232, 163, 61, 0.48);
   border-radius: 50%;
-  background: rgba(124, 148, 115, 0.12);
-  color: #c8dbbf;
+  background: var(--saffron);
+  color: var(--ink);
   cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28), 0 0 0 4px rgba(232, 163, 61, 0.1);
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-.shopping-topbar-btn svg {
-  width: 17px;
-  height: 17px;
+.shopping-floating-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
-.shopping-topbar-btn:hover {
-  border-color: rgba(124, 148, 115, 0.7);
-  background: rgba(124, 148, 115, 0.22);
-  transform: translateY(-1px);
+.shopping-floating-btn:hover {
+  background: #f0b34d;
+  transform: translateY(-2px) scale(1.03);
+}
+
+.shopping-floating-btn:active {
+  transform: scale(0.96);
 }
 
 /* Animación de entrada para tarjetas de recetas */
