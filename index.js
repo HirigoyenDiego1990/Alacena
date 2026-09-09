@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const { handleRecipeRequest } = require('./lib/recipe-service');
 const { handlePremiumPaymentConfig } = require('./lib/premium-payment-config');
+const { handlePremiumRequestNotification } = require('./lib/premium-request-notification');
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/generar-receta', handleRecipeRequest);
 app.post('/api/generar-receta', handleRecipeRequest);
 app.get('/api/premium-payment-config', handlePremiumPaymentConfig);
+app.post('/api/premium-request-notification', handlePremiumRequestNotification);
 
 // Arrancar el servidor (solo relevante en local; Vercel usa module.exports)
 const PORT = process.env.PORT || 3000;

@@ -1,104 +1,8 @@
--- Ejecutar una sola vez en el SQL Editor de Supabase.
--- Solicitudes de acceso Premium sin pagos ni datos personales adicionales.
+-- Ejecutar en el SQL Editor de Supabase.
+-- Actualización incremental: aviso único por correo para pagos Premium.
 
-create table if not exists public.premium_upgrade_requests (
-    user_id uuid primary key references auth.users(id) on delete cascade,
-    status text not null default 'pending'
-        check (status in ('pending', 'contacted', 'approved', 'rejected', 'cancelled')),
-    requested_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
-);
-
--- Una instrucción por columna mantiene este archivo compatible al volver a
--- ejecutarlo completo desde el SQL Editor.
-alter table public.premium_upgrade_requests
-    add column if not exists contact_email text;
-alter table public.premium_upgrade_requests
-    add column if not exists payer_name text;
-alter table public.premium_upgrade_requests
-    add column if not exists payment_reference text;
-alter table public.premium_upgrade_requests
-    add column if not exists payment_method text not null default 'bank_transfer';
-alter table public.premium_upgrade_requests
-    add column if not exists payment_reported_at timestamptz;
 alter table public.premium_upgrade_requests
     add column if not exists notification_sent_at timestamptz;
-
-alter table public.premium_upgrade_requests
-    drop constraint if exists premium_upgrade_requests_contact_email_length;
-alter table public.premium_upgrade_requests
-    add constraint premium_upgrade_requests_contact_email_length
-        check (contact_email is null or char_length(contact_email) between 3 and 254);
-alter table public.premium_upgrade_requests
-    drop constraint if exists premium_upgrade_requests_payer_name_length;
-alter table public.premium_upgrade_requests
-    add constraint premium_upgrade_requests_payer_name_length
-        check (payer_name is null or char_length(payer_name) between 2 and 120);
-alter table public.premium_upgrade_requests
-    drop constraint if exists premium_upgrade_requests_payment_reference_length;
-alter table public.premium_upgrade_requests
-    add constraint premium_upgrade_requests_payment_reference_length
-        check (payment_reference is null or char_length(payment_reference) <= 120);
-alter table public.premium_upgrade_requests
-    drop constraint if exists premium_upgrade_requests_payment_method_check;
-alter table public.premium_upgrade_requests
-    add constraint premium_upgrade_requests_payment_method_check
-        check (payment_method = 'bank_transfer');
-
-alter table public.premium_upgrade_requests enable row level security;
-
-drop policy if exists "users can read own premium request" on public.premium_upgrade_requests;
-create policy "users can read own premium request"
-on public.premium_upgrade_requests for select to authenticated
-using (auth.uid() = user_id);
-
-revoke all on public.premium_upgrade_requests from anon, authenticated;
-grant select on public.premium_upgrade_requests to authenticated;
-
-create or replace function public.request_premium_upgrade()
-returns jsonb
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-    v_user_id uuid := auth.uid();
-    v_status text;
-    v_requested_at timestamptz;
-begin
-    if v_user_id is null then
-        raise exception 'AUTH_REQUIRED';
-    end if;
-
-    if public.get_effective_plan(v_user_id) = 'premium' then
-        return jsonb_build_object('status', 'already_premium');
-    end if;
-
-    insert into public.premium_upgrade_requests (user_id, status)
-    values (v_user_id, 'pending')
-    on conflict (user_id) do update
-    set status = case
-            when public.premium_upgrade_requests.status in ('approved', 'contacted')
-                then public.premium_upgrade_requests.status
-            else 'pending'
-        end,
-        requested_at = case
-            when public.premium_upgrade_requests.status in ('rejected', 'cancelled')
-                then now()
-            else public.premium_upgrade_requests.requested_at
-        end,
-        updated_at = now()
-    returning status, requested_at into v_status, v_requested_at;
-
-    return jsonb_build_object(
-        'status', v_status,
-        'requested_at', v_requested_at
-    );
-end;
-$$;
-
-revoke all on function public.request_premium_upgrade() from public, anon, authenticated;
-grant execute on function public.request_premium_upgrade() to authenticated;
 
 create or replace function public.submit_premium_payment_request(
     p_contact_email text,
@@ -131,14 +35,12 @@ begin
     from public.user_entitlements
     where user_id = v_user_id;
 
-    -- Una cuenta Premium sin vencimiento es permanente y no necesita renovar.
     if v_entitlement_plan = 'premium'
         and v_entitlement_status = 'active'
         and v_period_end is null then
         return jsonb_build_object('status', 'already_premium');
     end if;
 
-    -- Las cuentas temporales pueden renovar durante sus últimos siete días.
     if public.get_effective_plan(v_user_id) = 'premium'
         and v_period_end > now() + interval '7 days' then
         return jsonb_build_object(
@@ -184,6 +86,7 @@ begin
         payment_method,
         requested_at,
         payment_reported_at,
+        notification_sent_at,
         updated_at
     ) values (
         v_user_id,
@@ -194,6 +97,7 @@ begin
         'bank_transfer',
         now(),
         now(),
+        null,
         now()
     )
     on conflict (user_id) do update
@@ -264,9 +168,3 @@ $$;
 
 revoke all on function public.claim_premium_payment_notification() from public, anon, authenticated;
 grant execute on function public.claim_premium_payment_notification() to authenticated;
-
-create index if not exists premium_upgrade_requests_status_idx
-on public.premium_upgrade_requests (status, requested_at);
-
-comment on table public.premium_upgrade_requests
-is 'Solicitudes de acceso Premium vinculadas solo al usuario autenticado; no procesan pagos.';

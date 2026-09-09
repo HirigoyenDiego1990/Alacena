@@ -1038,6 +1038,7 @@ async function loadPremiumRequestStatus() {
         statusText.textContent = data?.payment_reported_at
             ? `Recibimos tu aviso de pago. La ${currentPlanState.plan === 'premium' ? 'renovación' : 'activación'} está pendiente de revisión.`
             : 'Ya registraste tu interés. Podés continuar con la transferencia.';
+        if (data?.payment_reported_at) void notifyAdminAboutPremiumPayment();
     } else if (data?.status === 'approved' && currentPlanState.plan !== 'premium') {
         requestButton.disabled = true;
         requestButton.textContent = 'Solicitud aprobada';
@@ -1134,6 +1135,26 @@ function formatPremiumPrice(amount, currency) {
         currency: currency || 'ARS',
         maximumFractionDigits: 0
     }).format(numericAmount);
+}
+
+async function notifyAdminAboutPremiumPayment() {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        const response = await fetch('/api/premium-request-notification', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        });
+        if (!response.ok) throw new Error('PREMIUM_NOTIFICATION_FAILED');
+    } catch (error) {
+        // El pago ya quedó registrado; el panel del administrador sigue siendo el respaldo.
+        trackTechnicalError('premium_admin_notification', error);
+    }
 }
 
 async function loadPremiumPaymentScreen() {
@@ -1278,6 +1299,7 @@ document.getElementById('premium-payment-form').addEventListener('submit', async
     const actionName = periodInfo.canRenew ? 'renovación' : 'activación';
     statusText.textContent = `Aviso recibido. Revisaremos la transferencia antes de confirmar la ${actionName}.`;
     showAlert('¡Aviso recibido!', `La ${actionName} quedó pendiente de revisión manual.`, 'success');
+    void notifyAdminAboutPremiumPayment();
 });
 
 let isAppAdmin = false;
