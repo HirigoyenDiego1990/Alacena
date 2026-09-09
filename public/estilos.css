@@ -1129,7 +1129,6 @@ button[type="submit"]:hover {
 }
 
 .payment-safety-note,
-.payment-privacy-note,
 .premium-payment-form-status {
   margin: 11px 0 0;
   color: rgba(243, 239, 226, 0.38);
@@ -1667,6 +1666,59 @@ button[type="submit"]:hover {
 .btn-whatsapp:hover {
   background: rgba(37, 211, 102, 0.22);
   border-color: #25d366;
+}
+
+.btn-shopping-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(232, 163, 61, 0.38);
+  border-radius: 12px;
+  background: rgba(232, 163, 61, 0.12);
+  color: var(--saffron);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-shopping-add:hover {
+  border-color: var(--saffron);
+  background: rgba(232, 163, 61, 0.2);
+}
+
+.btn-shopping-add:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.cook-shopping-list-btn {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border: 1px solid rgba(124, 148, 115, 0.38);
+  border-radius: 12px;
+  background: rgba(124, 148, 115, 0.12);
+  color: #c8dbbf;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 430px) {
+  .actions-group-row:has(.cook-shopping-list-btn:not(.hidden)) {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 9px;
+  }
 }
 
 /* Animación de entrada para tarjetas de recetas */
@@ -2678,47 +2730,6 @@ button[type="submit"]:hover {
   cursor: pointer;
 }
 
-.shopping-list-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 13px 14px;
-  border: 1px solid rgba(251, 246, 236, 0.09);
-  border-radius: var(--r-md);
-  background: rgba(251, 246, 236, 0.035);
-}
-
-.shopping-list-label {
-  display: block;
-  margin-bottom: 3px;
-  color: rgba(243, 239, 226, 0.4);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-#shopping-list-range {
-  color: var(--cream-text);
-  font-size: 12px;
-}
-
-.shopping-refresh-btn {
-  padding: 8px 9px;
-  border: 1px solid rgba(232, 163, 61, 0.25);
-  border-radius: 8px;
-  background: rgba(232, 163, 61, 0.08);
-  color: var(--saffron);
-  font-size: 9px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.shopping-refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
 .shopping-list-summary {
   margin: 12px 0;
   color: rgba(243, 239, 226, 0.52);
@@ -3113,11 +3124,6 @@ button[type="submit"]:hover {
 @media (max-width: 430px) {
   .shopping-manual-form {
     grid-template-columns: minmax(0, 1fr) 58px 74px 36px;
-  }
-
-  .shopping-list-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .weekly-budget-form {

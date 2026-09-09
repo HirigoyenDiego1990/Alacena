@@ -104,6 +104,10 @@
                             <span>Generar receta</span>
                         </button>
                     </div>
+                    <button type="button" id="open-main-shopping-list-btn" class="cook-shopping-list-btn hidden">
+                        <span>🛒</span>
+                        Mi lista
+                    </button>
                 </div>
 
                 <div id="recipes-container" class="recipe-list"></div>
@@ -200,7 +204,7 @@
                     <div class="weekly-plan-actions">
                         <button type="button" id="autofill-week-btn" class="weekly-secondary-btn">✨ Completar espacios</button>
                         <button type="button" id="clear-week-btn" class="weekly-secondary-btn weekly-secondary-btn--danger">Borrar no bloqueadas</button>
-                        <button type="button" id="open-shopping-list-btn" class="weekly-secondary-btn weekly-secondary-btn--shopping">🛒 Lista de compras</button>
+                        <button type="button" id="open-shopping-list-btn" class="weekly-secondary-btn weekly-secondary-btn--shopping">🛒 Agregar faltantes a compras</button>
                     </div>
 
                     <p id="weekly-move-hint" class="weekly-move-hint hidden">Elegí “Mover” en el horario de destino.</p>
@@ -208,26 +212,18 @@
                 </div>
             </div>
 
-            <!-- Sub-vista: Lista de compras consolidada Premium -->
+            <!-- Sub-vista: Lista de compras Premium -->
             <div id="view-shopping-list" class="sub-view hidden">
-                <button type="button" id="back-to-weekly-plan-btn" class="shopping-back-btn">‹ Volver al plan</button>
-                <h2 class="section-title">Lista de compras</h2>
-                <p class="section-sub">Ingredientes que faltan para cocinar todas las recetas de la semana.</p>
-
-                <div class="shopping-list-toolbar">
-                    <div>
-                        <span class="shopping-list-label">Semana</span>
-                        <strong id="shopping-list-range">—</strong>
-                    </div>
-                    <button type="button" id="refresh-shopping-list-btn" class="shopping-refresh-btn">Actualizar desde el plan</button>
-                </div>
+                <button type="button" id="back-from-shopping-list-btn" class="shopping-back-btn">‹ Volver</button>
+                <h2 class="section-title">Mi lista de compras</h2>
+                <p class="section-sub">Tus faltantes elegidos y los productos que agregues.</p>
 
                 <div id="shopping-list-summary" class="shopping-list-summary">Preparando lista…</div>
 
                 <section class="budget-panel">
                     <div class="budget-panel-heading">
                         <div>
-                            <span class="budget-eyebrow">Economía semanal</span>
+                            <span class="budget-eyebrow">Control de gastos</span>
                             <h3>Presupuesto de compras</h3>
                         </div>
                         <span class="preference-premium-badge">Premium</span>
@@ -253,7 +249,7 @@
                     </form>
 
                     <div id="budget-summary-cards" class="budget-summary-cards"></div>
-                    <p id="budget-status-message" class="budget-status-message">Agregá precios para calcular la proyección semanal.</p>
+                    <p id="budget-status-message" class="budget-status-message">Agregá precios para calcular la compra.</p>
                 </section>
 
                 <form id="shopping-manual-form" class="shopping-manual-form">
@@ -277,7 +273,7 @@
 
                 <div class="shopping-list-footer">
                     <button type="button" id="share-shopping-list-btn" class="shopping-share-btn">Compartir pendientes por WhatsApp</button>
-                    <button type="button" id="clear-checked-shopping-btn" class="shopping-clear-btn">Borrar agregados comprados</button>
+                    <button type="button" id="clear-checked-shopping-btn" class="shopping-clear-btn">Borrar comprados</button>
                 </div>
             </div>
 
@@ -432,7 +428,7 @@
                             <li><strong>7 recetas + 3 sugerencias</strong> por generación</li>
                             <li>Ingredientes y favoritas sin límite</li>
                             <li>Preferencias avanzadas y objetivos</li>
-                            <li>Plan semanal y lista consolidada</li>
+                            <li>Plan semanal y lista de compras</li>
                             <li>Presupuesto, historial y colecciones</li>
                         </ul>
                         <button type="button" id="request-premium-btn" class="request-premium-btn">Quiero ser Premium</button>
@@ -509,7 +505,6 @@
                     </form>
 
                     <p id="premium-payment-form-status" class="premium-payment-form-status"></p>
-                    <p class="payment-privacy-note">Estos datos se usan únicamente para verificar el pago y activar Premium. Nunca se envían a Analytics.</p>
                 </section>
             </div>
 

@@ -262,6 +262,7 @@ function aplicarEstadoPlan(planData) {
     const weeklyPlanContent = document.getElementById('weekly-plan-content');
     const savedPremiumTools = document.getElementById('saved-premium-tools');
     const savedFreeUpsell = document.getElementById('saved-free-upsell');
+    const shoppingListShortcut = document.getElementById('open-main-shopping-list-btn');
 
     if (badge) {
         const periodInfo = getPremiumPeriodInfo();
@@ -296,6 +297,7 @@ function aplicarEstadoPlan(planData) {
     if (weeklyPlanContent) weeklyPlanContent.classList.toggle('hidden', !isPremium);
     if (savedPremiumTools) savedPremiumTools.classList.toggle('hidden', !isPremium);
     if (savedFreeUpsell) savedFreeUpsell.classList.toggle('hidden', isPremium);
+    if (shoppingListShortcut) shoppingListShortcut.classList.toggle('hidden', !isPremium);
     updatePlansView();
 
 }
@@ -810,6 +812,23 @@ async function ejecutarGeneracion() {
                    </div>`
                 : '';
 
+            const faltantesEstructurados = (Array.isArray(recipe.required_ingredients) ? recipe.required_ingredients : [])
+                .filter(item => item?.availability === 'missing')
+                .map(item => ({
+                    name: String(item.name || '').trim(),
+                    quantity: Number(item.quantity) || 1,
+                    unit: String(item.unit || 'unidad').trim()
+                }))
+                .filter(item => item.name);
+            const faltantesParaCompras = faltantesEstructurados.length > 0
+                ? faltantesEstructurados
+                : (recipe.missing_ingredients || []).map(name => ({ name, quantity: 1, unit: 'unidad' }));
+            const botonListaCompras = currentPlanState.plan === 'premium' && esSugerencia && faltantesParaCompras.length > 0
+                ? `<button type="button" class="btn-shopping-add" data-recipe-title="${encodeURIComponent(recipe.title)}" data-shopping-items="${encodeURIComponent(JSON.stringify(faltantesParaCompras))}">
+                     <span>🛒</span> Agregar faltantes a compras
+                   </button>`
+                : '';
+
             const pasosArray = parsearPasos(recipe.instructions);
             const requiredIngredientsHTML = renderIngredientesEstructurados(recipe.required_ingredients);
             const tagsHTML = renderRecipeTags(recipe.tags);
@@ -838,6 +857,7 @@ async function ejecutarGeneracion() {
                     <span>👨‍🍳 Cocinar Paso a Paso</span>
                     </button>
                     ${botonWhatsApp}
+                    ${botonListaCompras}
                 </div>
             `;
         }).join('');
@@ -876,6 +896,29 @@ function ocultarCargando() {
 }
 
 generateBtn.addEventListener('click', ejecutarGeneracion);
+
+recipesContainer.addEventListener('click', async event => {
+    const button = event.target.closest('.btn-shopping-add');
+    if (!button || button.disabled) return;
+
+    let items = [];
+    try {
+        items = JSON.parse(decodeURIComponent(button.dataset.shoppingItems || '[]'));
+    } catch (error) {
+        trackTechnicalError('shopping_recipe_items_parse', error);
+    }
+    if (items.length === 0) return;
+
+    button.disabled = true;
+    const originalText = button.innerHTML;
+    button.textContent = 'Agregando…';
+    const added = await agregarFaltantesRecetaACompras(
+        decodeURIComponent(button.dataset.recipeTitle || 'Receta'),
+        items
+    );
+    button.innerHTML = added ? '<span>✓</span> Agregados a compras' : originalText;
+    button.disabled = added;
+});
 
 // Navegación entre vistas
 const viewCook = document.getElementById('view-cook');
@@ -923,7 +966,7 @@ let plansReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
 
 function obtenerVistaActualParaVolver() {
     if (!viewShoppingList.classList.contains('hidden')) {
-        return { view: viewShoppingList, tab: tabWeeklyPlan, screen: 'shopping_list' };
+        return { view: viewShoppingList, tab: shoppingListReturnState?.tab || tabCook, screen: 'shopping_list' };
     }
     if (!viewWeeklyPlan.classList.contains('hidden')) {
         return { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' };
@@ -1840,11 +1883,13 @@ function renderWeeklyPlan() {
     const collectionFilterContainer = collectionFilter?.closest('.weekly-collection-filter');
     const autofillButton = document.getElementById('autofill-week-btn');
     const clearButton = document.getElementById('clear-week-btn');
+    const addPlanToShoppingButton = document.getElementById('open-shopping-list-btn');
 
     emptyState?.classList.toggle('hidden', !showEmptyState);
     collectionFilterContainer?.classList.toggle('hidden', !hasRecipes);
     if (autofillButton) autofillButton.disabled = !hasRecipes;
     if (clearButton) clearButton.disabled = !hasAssignedMeals;
+    if (addPlanToShoppingButton) addPlanToShoppingButton.disabled = !hasAssignedMeals;
     grid.classList.toggle('hidden', showEmptyState);
 
     grid.innerHTML = Array.from({ length: 7 }, (_, dayIndex) => {
@@ -2183,6 +2228,8 @@ const shoppingListState = {
     loadVersion: 0
 };
 
+let shoppingListReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
+
 function normalizarClaveCompra(value) {
     return String(value || '')
         .normalize('NFD')
@@ -2242,7 +2289,7 @@ function renderBudgetSummary() {
 
     status.className = 'budget-status-message';
     if (estimated <= 0 && projected <= 0) {
-        status.textContent = 'Agregá precios para calcular la proyección semanal.';
+        status.textContent = 'Agregá precios para calcular la compra.';
     } else if (!hasBudget) {
         status.textContent = `La compra proyectada es de ${formatearDinero(projected)}. Definí un presupuesto para compararla.`;
     } else if (difference >= 0) {
@@ -2298,12 +2345,7 @@ function calcularComprasDesdePlan(pantryItems) {
 function renderShoppingList() {
     const container = document.getElementById('shopping-list-items');
     const summary = document.getElementById('shopping-list-summary');
-    const range = document.getElementById('shopping-list-range');
-    if (!container || !summary || !range) return;
-
-    const weekEnd = sumarDias(weeklyPlanState.weekStart, 6);
-    const formatter = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' });
-    range.textContent = `${formatter.format(weeklyPlanState.weekStart)} – ${formatter.format(weekEnd)}`;
+    if (!container || !summary) return;
 
     const pending = shoppingListState.items.filter(item => !item.is_checked);
     const checked = shoppingListState.items.filter(item => item.is_checked);
@@ -2314,8 +2356,8 @@ function renderShoppingList() {
         container.innerHTML = `
             <div class="shopping-empty-state">
                 <span>✓</span>
-                <strong>No falta comprar nada</strong>
-                <p>Agregá recetas al plan o sumá productos manualmente.</p>
+                <strong>Tu lista está vacía</strong>
+                <p>Elegí los faltantes de una receta o agregá un producto.</p>
             </div>
         `;
         return;
@@ -2334,10 +2376,8 @@ function renderShoppingList() {
                             <small>${formatearCantidad(item.quantity)} ${escaparHTML(item.unit)}</small>
                         </span>
                     </label>
-                    <span class="shopping-item-origin">${item.source_type === 'manual' ? 'Agregado' : 'Plan'}</span>
-                    ${item.source_type === 'manual'
-                        ? '<button type="button" class="shopping-item-delete" aria-label="Eliminar producto">×</button>'
-                        : ''}
+                    <span class="shopping-item-origin">${item.source_type === 'recipe' ? 'Receta' : (item.source_type === 'plan' ? 'Plan' : 'Agregado')}</span>
+                    <button type="button" class="shopping-item-delete" aria-label="Eliminar producto">×</button>
                     <div class="shopping-item-costs">
                         <label>
                             <span>Estimado total</span>
@@ -2354,6 +2394,140 @@ function renderShoppingList() {
     `;
 
     container.innerHTML = renderGroup('Por comprar', pending, false) + renderGroup('Comprados', checked, true);
+}
+
+async function asegurarListaComprasPersonal(user) {
+    const { data: existingList, error: selectError } = await supabase
+        .from('shopping_lists')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('list_kind', 'personal')
+        .maybeSingle();
+    if (selectError) throw selectError;
+
+    let list = existingList;
+    if (!list) {
+        const { data: insertedList, error: insertError } = await supabase
+            .from('shopping_lists')
+            .insert({
+                user_id: user.id,
+                weekly_plan_id: null,
+                list_kind: 'personal'
+            })
+            .select('*')
+            .single();
+
+        if (insertError?.code === '23505') {
+            const { data: concurrentList, error: retryError } = await supabase
+                .from('shopping_lists')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('list_kind', 'personal')
+                .single();
+            if (retryError) throw retryError;
+            list = concurrentList;
+        } else if (insertError) {
+            throw insertError;
+        } else {
+            list = insertedList;
+        }
+    }
+
+    shoppingListState.listId = list.id;
+    shoppingListState.userId = user.id;
+    shoppingListState.budgetAmount = list.budget_amount === null || list.budget_amount === undefined
+        ? null
+        : Number(list.budget_amount);
+    shoppingListState.currency = list.currency || 'ARS';
+    return list;
+}
+
+async function agregarFaltantesRecetaACompras(recipeTitle, rawItems) {
+    if (currentPlanState.plan !== 'premium') return false;
+
+    const items = (Array.isArray(rawItems) ? rawItems : []).map(item => ({
+        name: String(item?.name || '').trim().slice(0, 100),
+        quantity: Math.min(Math.max(Number(item?.quantity) || 1, 0.01), 99999),
+        unit: String(item?.unit || 'unidad').trim().toLocaleLowerCase('es').slice(0, 30) || 'unidad'
+    })).filter(item => item.name);
+    if (items.length === 0) return false;
+
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+        await asegurarListaComprasPersonal(user);
+
+        const recipeRef = await crearHuellaPrivada(JSON.stringify({ title: recipeTitle, items }));
+        if (!recipeRef) throw new Error('No se pudo identificar la receta.');
+
+        const { data: existingItems, error: existingError } = await supabase
+            .from('shopping_list_items')
+            .select('*')
+            .eq('list_id', shoppingListState.listId)
+            .eq('source_type', 'recipe');
+        if (existingError) throw existingError;
+
+        const existingByKey = new Map((existingItems || []).map(item => [item.source_key, item]));
+        let addedCount = 0;
+
+        for (const item of items) {
+            const sourceKey = `${normalizarClaveCompra(item.name)}|${item.unit}`;
+            const existing = existingByKey.get(sourceKey);
+            const sourceRefs = Array.isArray(existing?.source_refs) ? existing.source_refs : [];
+            if (sourceRefs.includes(recipeRef)) continue;
+
+            if (existing) {
+                const { error } = await supabase
+                    .from('shopping_list_items')
+                    .update({
+                        quantity: Math.min(redondearCantidadCompra(Number(existing.quantity) + item.quantity), 99999),
+                        source_refs: [...sourceRefs, recipeRef],
+                        is_checked: false
+                    })
+                    .eq('id', existing.id);
+                if (error) throw error;
+                existing.quantity = Number(existing.quantity) + item.quantity;
+                existing.source_refs = [...sourceRefs, recipeRef];
+            } else {
+                const payload = {
+                    list_id: shoppingListState.listId,
+                    user_id: user.id,
+                    source_type: 'recipe',
+                    source_key: sourceKey,
+                    name: item.name,
+                    quantity: redondearCantidadCompra(item.quantity),
+                    unit: item.unit,
+                    is_checked: false,
+                    source_refs: [recipeRef]
+                };
+                const { data: inserted, error } = await supabase
+                    .from('shopping_list_items')
+                    .insert(payload)
+                    .select('*')
+                    .single();
+                if (error) throw error;
+                existingByKey.set(sourceKey, inserted);
+            }
+            addedCount += 1;
+        }
+
+        trackAnalyticsEvent('shopping_recipe_missing_added', {
+            item_count: addedCount,
+            recipe_id: await obtenerIdReceta(recipeTitle)
+        });
+        showAlert(
+            addedCount > 0 ? 'Agregado a compras' : 'Ya estaba agregado',
+            addedCount > 0
+                ? `${addedCount} ${addedCount === 1 ? 'producto quedó' : 'productos quedaron'} en tu lista.`
+                : 'Los faltantes de esta receta ya estaban en tu lista.',
+            'success'
+        );
+        return true;
+    } catch (error) {
+        trackTechnicalError('shopping_recipe_add', error);
+        showAlert('No se pudo agregar', 'Intentá nuevamente en unos segundos.', 'error');
+        return false;
+    }
 }
 
 async function sincronizarComprasDelPlan(existingItems, pantryItems) {
@@ -2397,8 +2571,8 @@ async function sincronizarComprasDelPlan(existingItems, pantryItems) {
     });
 }
 
-async function loadShoppingList({ syncFromPlan = true } = {}) {
-    if (currentPlanState.plan !== 'premium' || !weeklyPlanState.planId) return;
+async function loadShoppingList({ syncFromPlan = false } = {}) {
+    if (currentPlanState.plan !== 'premium') return;
 
     const loadVersion = ++shoppingListState.loadVersion;
     const container = document.getElementById('shopping-list-items');
@@ -2408,34 +2582,24 @@ async function loadShoppingList({ syncFromPlan = true } = {}) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || loadVersion !== shoppingListState.loadVersion) return;
 
-        const { data: list, error: listError } = await supabase
-            .from('shopping_lists')
-            .upsert({
-                user_id: user.id,
-                weekly_plan_id: weeklyPlanState.planId,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id,weekly_plan_id' })
-            .select('*')
-            .single();
-        if (listError) throw listError;
-
-        shoppingListState.listId = list.id;
-        shoppingListState.userId = user.id;
-        shoppingListState.budgetAmount = list.budget_amount === null || list.budget_amount === undefined
-            ? null
-            : Number(list.budget_amount);
-        shoppingListState.currency = list.currency || 'ARS';
+        const list = await asegurarListaComprasPersonal(user);
         document.getElementById('weekly-budget-amount').value = shoppingListState.budgetAmount ?? '';
         document.getElementById('weekly-budget-currency').value = shoppingListState.currency;
 
-        const [itemsResult, pantryResult] = await Promise.all([
-            supabase.from('shopping_list_items').select('*').eq('list_id', list.id),
-            supabase.from('pantry').select('ingredient,quantity,unit').eq('user_id', user.id)
-        ]);
-        if (itemsResult.error || pantryResult.error) throw itemsResult.error || pantryResult.error;
+        const { data: existingItems, error: itemsError } = await supabase
+            .from('shopping_list_items')
+            .select('*')
+            .eq('list_id', list.id);
+        if (itemsError) throw itemsError;
 
         if (syncFromPlan) {
-            await sincronizarComprasDelPlan(itemsResult.data || [], pantryResult.data || []);
+            if (!weeklyPlanState.planId) throw new Error('Primero abrí el plan semanal.');
+            const { data: pantryItems, error: pantryError } = await supabase
+                .from('pantry')
+                .select('ingredient,quantity,unit')
+                .eq('user_id', user.id);
+            if (pantryError) throw pantryError;
+            await sincronizarComprasDelPlan(existingItems || [], pantryItems || []);
         }
 
         const { data: finalItems, error: finalError } = await supabase
@@ -2457,20 +2621,26 @@ async function loadShoppingList({ syncFromPlan = true } = {}) {
 
 document.getElementById('open-shopping-list-btn').addEventListener('click', async () => {
     if (currentPlanState.plan !== 'premium') return;
+    shoppingListReturnState = { view: viewWeeklyPlan, tab: tabWeeklyPlan, screen: 'weekly_plan' };
     mostrarSubVista(viewShoppingList, tabWeeklyPlan, 'shopping_list');
     trackAnalyticsEvent('shopping_list_opened');
+    await loadShoppingList({ syncFromPlan: true });
+});
+
+document.getElementById('open-main-shopping-list-btn').addEventListener('click', async () => {
+    if (currentPlanState.plan !== 'premium') return;
+    shoppingListReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
+    mostrarSubVista(viewShoppingList, tabCook, 'shopping_list');
+    trackAnalyticsEvent('shopping_list_opened', { source: 'cook' });
     await loadShoppingList();
 });
 
-document.getElementById('back-to-weekly-plan-btn').addEventListener('click', () => {
-    mostrarSubVista(viewWeeklyPlan, tabWeeklyPlan, 'weekly_plan');
-});
-
-document.getElementById('refresh-shopping-list-btn').addEventListener('click', async event => {
-    event.currentTarget.disabled = true;
-    await loadWeeklyPlan();
-    await loadShoppingList();
-    event.currentTarget.disabled = false;
+document.getElementById('back-from-shopping-list-btn').addEventListener('click', () => {
+    mostrarSubVista(
+        shoppingListReturnState.view,
+        shoppingListReturnState.tab,
+        shoppingListReturnState.screen
+    );
 });
 
 document.getElementById('shopping-manual-form').addEventListener('submit', async event => {
@@ -2583,7 +2753,7 @@ document.getElementById('weekly-budget-form').addEventListener('submit', async e
     shoppingListState.currency = currencyInput.value;
     renderBudgetSummary();
     trackAnalyticsEvent('weekly_budget_updated', { currency: currencyInput.value });
-    showAlert('Presupuesto guardado', 'La comparación semanal ya está actualizada.', 'success');
+    showAlert('Presupuesto guardado', 'La comparación de la compra ya está actualizada.', 'success');
 });
 
 document.getElementById('shopping-list-items').addEventListener('click', async event => {
@@ -2591,7 +2761,7 @@ document.getElementById('shopping-list-items').addEventListener('click', async e
     if (!deleteButton) return;
     const row = deleteButton.closest('[data-shopping-item-id]');
     const item = shoppingListState.items.find(entry => String(entry.id) === row?.dataset.shoppingItemId);
-    if (!item || item.source_type !== 'manual') return;
+    if (!item) return;
 
     const { error } = await supabase.from('shopping_list_items').delete().eq('id', item.id);
     if (error) {
@@ -2603,15 +2773,15 @@ document.getElementById('shopping-list-items').addEventListener('click', async e
 });
 
 document.getElementById('clear-checked-shopping-btn').addEventListener('click', async () => {
-    const checkedManualIds = shoppingListState.items
-        .filter(item => item.is_checked && item.source_type === 'manual')
+    const checkedIds = shoppingListState.items
+        .filter(item => item.is_checked)
         .map(item => item.id);
-    if (checkedManualIds.length === 0) {
-        showAlert('Lista al día', 'No hay productos agregados manualmente para borrar.', 'info');
+    if (checkedIds.length === 0) {
+        showAlert('Lista al día', 'No hay productos comprados para borrar.', 'info');
         return;
     }
 
-    const { error } = await supabase.from('shopping_list_items').delete().in('id', checkedManualIds);
+    const { error } = await supabase.from('shopping_list_items').delete().in('id', checkedIds);
     if (error) {
         trackTechnicalError('shopping_checked_clear', error);
         showAlert('Error', 'No se pudieron borrar los productos.', 'error');
@@ -3364,7 +3534,7 @@ function finalizarTimer() {
 
     reproducirPitidoAlarma();
     if (alarmaInterval) clearInterval(alarmaInterval);
-    alarmaInterval = setInterval(reproducirPitidoAlarma, 400);
+    alarmaInterval = setInterval(reproducirPitidoAlarma, 1450);
 
     showAlert('⏰ ¡Tiempo cumplido!', 'El temporizador de cocina ha finalizado. Presiona reiniciar o cambiar tiempo para apagar la alarma.', 'warning');
 }
@@ -3403,30 +3573,97 @@ function restaurarTimer() {
     }
 }
 
-// Iniciar o pausar el timer
-// Función para reproducir un sonido de alarma electrónico
-let alarmaInterval = null; // Variable para controlar el bucle del sonido
+// Alarma propia: tres pulsos digitales, más reconocibles que el tono del sistema.
+let alarmaInterval = null;
+let timerAudioContext = null;
+let timerAudioOutput = null;
+const alarmaVocesActivas = new Set();
 
-// Función para reproducir un pitido individual de alarma
+function obtenerAudioTimer() {
+    if (timerAudioContext) return timerAudioContext;
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+
+    timerAudioContext = new AudioContextClass();
+    const compressor = timerAudioContext.createDynamicsCompressor();
+    compressor.threshold.value = -16;
+    compressor.knee.value = 8;
+    compressor.ratio.value = 6;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.18;
+
+    timerAudioOutput = timerAudioContext.createGain();
+    timerAudioOutput.gain.value = 0.9;
+    timerAudioOutput.connect(compressor);
+    compressor.connect(timerAudioContext.destination);
+    return timerAudioContext;
+}
+
+function prepararAudioTimer() {
+    try {
+        const audioCtx = obtenerAudioTimer();
+        if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {});
+    } catch (error) {
+        console.warn('No se pudo preparar el audio del temporizador:', error);
+    }
+}
+
+function programarPulsoTimer(audioCtx, startTime, frequency, duration = 0.19) {
+    const oscillator = audioCtx.createOscillator();
+    const overtone = audioCtx.createOscillator();
+    const mainGain = audioCtx.createGain();
+    const overtoneGain = audioCtx.createGain();
+    const endTime = startTime + duration;
+
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(frequency, startTime);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.06, endTime);
+    overtone.type = 'sine';
+    overtone.frequency.setValueAtTime(frequency * 2, startTime);
+
+    mainGain.gain.setValueAtTime(0.0001, startTime);
+    mainGain.gain.exponentialRampToValueAtTime(0.2, startTime + 0.012);
+    mainGain.gain.setValueAtTime(0.2, endTime - 0.045);
+    mainGain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    overtoneGain.gain.setValueAtTime(0.0001, startTime);
+    overtoneGain.gain.exponentialRampToValueAtTime(0.055, startTime + 0.012);
+    overtoneGain.gain.setValueAtTime(0.055, endTime - 0.045);
+    overtoneGain.gain.exponentialRampToValueAtTime(0.0001, endTime);
+
+    oscillator.connect(mainGain);
+    overtone.connect(overtoneGain);
+    mainGain.connect(timerAudioOutput);
+    overtoneGain.connect(timerAudioOutput);
+
+    alarmaVocesActivas.add(oscillator);
+    alarmaVocesActivas.add(overtone);
+    oscillator.addEventListener('ended', () => alarmaVocesActivas.delete(oscillator), { once: true });
+    overtone.addEventListener('ended', () => alarmaVocesActivas.delete(overtone), { once: true });
+
+    oscillator.start(startTime);
+    overtone.start(startTime);
+    oscillator.stop(endTime);
+    overtone.stop(endTime);
+}
+
 function reproducirPitidoAlarma() {
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Tono agudo
-        
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
-        
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        
-        osc.start(audioCtx.currentTime);
-        osc.stop(audioCtx.currentTime + 0.2);
-    } catch (e) {
-        console.warn("Audio Context bloqueado o no soportado:", e);
+        const audioCtx = obtenerAudioTimer();
+        if (!audioCtx) return;
+
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(reproducirPitidoAlarma).catch(() => {});
+            return;
+        }
+
+        const startTime = audioCtx.currentTime + 0.025;
+        programarPulsoTimer(audioCtx, startTime, 1180);
+        programarPulsoTimer(audioCtx, startTime + 0.27, 1180);
+        programarPulsoTimer(audioCtx, startTime + 0.54, 1420, 0.25);
+    } catch (error) {
+        console.warn('No se pudo reproducir la alarma del temporizador:', error);
     }
 }
 
@@ -3443,7 +3680,8 @@ function toggleTimer() {
         });
     } else {
         if (timeLeftSeconds <= 0) return;
-        
+
+        prepararAudioTimer();
         isTimerRunning = true;
         timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
         guardarTimer();
@@ -3463,6 +3701,14 @@ function toggleTimer() {
 function detenerAlarmaTimer() {
     if (alarmaInterval) clearInterval(alarmaInterval);
     alarmaInterval = null;
+    alarmaVocesActivas.forEach(voice => {
+        try {
+            voice.stop();
+        } catch (error) {
+            // La voz ya había terminado.
+        }
+    });
+    alarmaVocesActivas.clear();
     const cajaTimer = document.querySelector('.cooking-timer-box');
     if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
 }

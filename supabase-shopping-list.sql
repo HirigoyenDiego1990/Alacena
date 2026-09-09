@@ -1,28 +1,35 @@
 -- Ejecutar una sola vez en el SQL Editor de Supabase.
--- Lista de compras consolidada, disponible exclusivamente para usuarios Premium.
+-- Lista de compras personal, disponible exclusivamente para usuarios Premium.
 
 create table if not exists public.shopping_lists (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users(id) on delete cascade,
-    weekly_plan_id uuid not null references public.weekly_plans(id) on delete cascade,
+    weekly_plan_id uuid references public.weekly_plans(id) on delete cascade,
+    list_kind text not null default 'personal' check (list_kind in ('personal', 'weekly')),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    unique (user_id, weekly_plan_id)
+    unique (user_id, weekly_plan_id),
+    check (
+        (list_kind = 'personal' and weekly_plan_id is null)
+        or (list_kind = 'weekly' and weekly_plan_id is not null)
+    )
 );
 
 create table if not exists public.shopping_list_items (
     id uuid primary key default gen_random_uuid(),
     list_id uuid not null references public.shopping_lists(id) on delete cascade,
     user_id uuid not null references auth.users(id) on delete cascade,
-    source_type text not null check (source_type in ('plan', 'manual')),
+    source_type text not null check (source_type in ('recipe', 'plan', 'manual')),
     source_key text not null check (char_length(source_key) between 1 and 160),
     name text not null check (char_length(btrim(name)) between 1 and 100),
     quantity numeric(12, 2) not null check (quantity > 0 and quantity <= 99999),
     unit text not null check (char_length(btrim(unit)) between 1 and 30),
     is_checked boolean not null default false,
+    source_refs text[] not null default '{}'::text[],
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
-    unique (list_id, source_type, source_key)
+    unique (list_id, source_type, source_key),
+    check (cardinality(source_refs) <= 200)
 );
 
 create or replace function public.validate_shopping_list_item()
@@ -68,9 +75,15 @@ on public.shopping_lists for insert to authenticated
 with check (
     auth.uid() = user_id
     and public.is_current_user_premium()
-    and exists (
-        select 1 from public.weekly_plans
-        where id = weekly_plan_id and user_id = auth.uid()
+    and (
+        (list_kind = 'personal' and weekly_plan_id is null)
+        or (
+            list_kind = 'weekly'
+            and exists (
+                select 1 from public.weekly_plans
+                where id = weekly_plan_id and user_id = auth.uid()
+            )
+        )
     )
 );
 
@@ -81,9 +94,15 @@ using (auth.uid() = user_id and public.is_current_user_premium())
 with check (
     auth.uid() = user_id
     and public.is_current_user_premium()
-    and exists (
-        select 1 from public.weekly_plans
-        where id = weekly_plan_id and user_id = auth.uid()
+    and (
+        (list_kind = 'personal' and weekly_plan_id is null)
+        or (
+            list_kind = 'weekly'
+            and exists (
+                select 1 from public.weekly_plans
+                where id = weekly_plan_id and user_id = auth.uid()
+            )
+        )
     )
 );
 
@@ -135,8 +154,12 @@ revoke all on function public.validate_shopping_list_item() from public, anon, a
 create index if not exists shopping_lists_user_plan_idx
 on public.shopping_lists (user_id, weekly_plan_id);
 
+create unique index if not exists shopping_lists_one_personal_per_user_idx
+on public.shopping_lists (user_id)
+where list_kind = 'personal';
+
 create index if not exists shopping_list_items_list_status_idx
 on public.shopping_list_items (list_id, is_checked, name);
 
-comment on table public.shopping_lists is 'Listas Premium asociadas a una semana planificada.';
-comment on table public.shopping_list_items is 'Productos consolidados desde el plan o agregados manualmente.';
+comment on table public.shopping_lists is 'Listas personales y listas históricas asociadas a planes.';
+comment on table public.shopping_list_items is 'Productos elegidos desde recetas, planes o agregados manualmente.';
