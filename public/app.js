@@ -3285,23 +3285,47 @@ document.addEventListener('click', (e) => {
 
 let timerInterval = null;
 let timeLeftSeconds = 0;
+let timerTotalSeconds = 0;
 let isTimerRunning = false;
 let timerEndTimestamp = null;
 const TIMER_STORAGE_KEY = 'alacena.cookingTimer.v1';
+const MAX_TIMER_SECONDS = 8 * 60 * 60;
 
-// Actualiza el texto en pantalla del timer
-function actualizarDisplayTimer() {
+// Actualiza el tiempo, el estado y el progreso visual del temporizador.
+function actualizarDisplayTimer(statusOverride = '') {
     const mins = Math.floor(timeLeftSeconds / 60);
     const secs = timeLeftSeconds % 60;
     const displayStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    
     const displayEl = document.getElementById('cooking-timer-display');
     if (displayEl) displayEl.textContent = displayStr;
+
+    const progressEl = document.getElementById('timer-progress-ring');
+    const progress = timerTotalSeconds > 0
+        ? Math.max(0, Math.min(1, timeLeftSeconds / timerTotalSeconds))
+        : 0;
+    if (progressEl) {
+        progressEl.style.setProperty('--timer-progress', `${progress * 360}deg`);
+        progressEl.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
+    }
+
+    const statusEl = document.getElementById('timer-status-text');
+    if (statusEl) {
+        statusEl.textContent = statusOverride || (
+            isTimerRunning
+                ? 'En marcha'
+                : timeLeftSeconds > 0
+                    ? 'Listo para iniciar'
+                    : 'Elegí un tiempo'
+        );
+    }
+
+    actualizarBotonTimer();
 }
 
 function guardarTimer() {
     localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({
         timeLeftSeconds,
+        timerTotalSeconds,
         isTimerRunning,
         timerEndTimestamp
     }));
@@ -3318,8 +3342,9 @@ function actualizarBotonTimer() {
     const toggleBtn = document.getElementById('timer-toggle-btn');
     if (!toggleBtn) return;
 
-    toggleBtn.textContent = isTimerRunning ? 'Pausar' : (timeLeftSeconds > 0 ? 'Reanudar' : 'Iniciar');
+    toggleBtn.textContent = isTimerRunning ? 'Pausar' : 'Iniciar';
     toggleBtn.classList.toggle('running', isTimerRunning);
+    toggleBtn.disabled = timeLeftSeconds <= 0;
 }
 
 function finalizarTimer() {
@@ -3328,8 +3353,7 @@ function finalizarTimer() {
     timerEndTimestamp = null;
     timeLeftSeconds = 0;
     guardarTimer();
-    actualizarDisplayTimer();
-    actualizarBotonTimer();
+    actualizarDisplayTimer('¡Tiempo cumplido!');
     trackAnalyticsEvent('timer_finished');
 
     // Efecto visual y vibración inicial
@@ -3363,6 +3387,7 @@ function restaurarTimer() {
         if (!timerGuardado) return;
 
         timeLeftSeconds = Number(timerGuardado.timeLeftSeconds) || 0;
+        timerTotalSeconds = Number(timerGuardado.timerTotalSeconds) || timeLeftSeconds;
         isTimerRunning = Boolean(timerGuardado.isTimerRunning);
         timerEndTimestamp = Number(timerGuardado.timerEndTimestamp) || null;
 
@@ -3372,7 +3397,6 @@ function restaurarTimer() {
         }
 
         actualizarDisplayTimer();
-        actualizarBotonTimer();
         if (isTimerRunning) iniciarActualizacionTimer();
     } catch (error) {
         localStorage.removeItem(TIMER_STORAGE_KEY);
@@ -3413,8 +3437,7 @@ function toggleTimer() {
         isTimerRunning = false;
         timerEndTimestamp = null;
         guardarTimer();
-        actualizarDisplayTimer();
-        actualizarBotonTimer();
+        actualizarDisplayTimer('En pausa');
         trackAnalyticsEvent('timer_paused', {
             remaining_seconds: timeLeftSeconds
         });
@@ -3424,7 +3447,7 @@ function toggleTimer() {
         isTimerRunning = true;
         timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
         guardarTimer();
-        actualizarBotonTimer();
+        actualizarDisplayTimer();
         trackAnalyticsEvent('timer_started', {
             configured_minutes: Math.ceil(timeLeftSeconds / 60),
             remaining_seconds: timeLeftSeconds
@@ -3437,50 +3460,78 @@ function toggleTimer() {
     }
 }
 
+function detenerAlarmaTimer() {
+    if (alarmaInterval) clearInterval(alarmaInterval);
+    alarmaInterval = null;
+    const cajaTimer = document.querySelector('.cooking-timer-box');
+    if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
+}
+
+function configurarTimer(seconds, source, eventDetails = {}) {
+    sincronizarTimerConHoraActual();
+    detenerAlarmaTimer();
+
+    timeLeftSeconds = Math.max(0, Math.min(MAX_TIMER_SECONDS, Math.round(seconds)));
+    timerTotalSeconds = timeLeftSeconds;
+
+    if (timeLeftSeconds === 0) {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        timerEndTimestamp = null;
+    } else if (isTimerRunning) {
+        timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
+    }
+
+    guardarTimer();
+    actualizarDisplayTimer(isTimerRunning ? 'En marcha' : 'Listo para iniciar');
+    trackAnalyticsEvent('timer_configured', {
+        source,
+        configured_minutes: Math.ceil(timeLeftSeconds / 60),
+        ...eventDetails
+    });
+}
+
 // Eventos de control para los botones del timer
 document.addEventListener('click', (e) => {
-    // Botones de minutos predeterminados (+1, +3, +5, +10)
-    if (e.target.classList.contains('timer-preset-btn')) {
-        const minutesToAdd = parseInt(e.target.getAttribute('data-time'), 10);
+    const presetBtn = e.target.closest('.timer-preset-btn');
+    if (presetBtn) {
+        const presetMinutes = parseInt(presetBtn.getAttribute('data-time'), 10);
+        configurarTimer(presetMinutes * 60, 'preset', { preset_minutes: presetMinutes });
+        return;
+    }
+
+    const adjustBtn = e.target.closest('.timer-adjust-btn');
+    if (adjustBtn) {
+        const adjustmentMinutes = parseInt(adjustBtn.getAttribute('data-adjust'), 10);
         sincronizarTimerConHoraActual();
-        timeLeftSeconds += minutesToAdd * 60;
-        if (isTimerRunning) timerEndTimestamp = Date.now() + (timeLeftSeconds * 1000);
-        guardarTimer();
-        actualizarDisplayTimer();
-        trackAnalyticsEvent('timer_configured', {
-            minutes_added: minutesToAdd,
-            configured_minutes: Math.ceil(timeLeftSeconds / 60)
+        configurarTimer(timeLeftSeconds + (adjustmentMinutes * 60), 'adjustment', {
+            adjustment_minutes: adjustmentMinutes
         });
+        return;
     }
     
     // Botón Iniciar / Pausar
     if (e.target.id === 'timer-toggle-btn') {
         toggleTimer();
+        return;
     }
     
     // Botón Reset
-    // Botón Reset (asegúrate de agregar esta línea en tu manejador de reset existente)
-if (e.target.id === 'timer-reset-btn' || e.target.closest('#timer-reset-btn')) {
-    const previousSeconds = timeLeftSeconds;
-    const wasRunning = isTimerRunning;
-    clearInterval(timerInterval);
-    clearInterval(alarmaInterval); // <--- Esto detiene el sonido sin parar
-    isTimerRunning = false;
-    timeLeftSeconds = 0;
-    timerEndTimestamp = null;
-    guardarTimer();
-    actualizarDisplayTimer();
+    if (e.target.closest('#timer-reset-btn')) {
+        const previousSeconds = timeLeftSeconds;
+        const wasRunning = isTimerRunning;
+        clearInterval(timerInterval);
+        detenerAlarmaTimer();
+        isTimerRunning = false;
+        timeLeftSeconds = 0;
+        timerTotalSeconds = 0;
+        timerEndTimestamp = null;
+        guardarTimer();
+        actualizarDisplayTimer();
         trackAnalyticsEvent('timer_reset', {
             previous_seconds: previousSeconds,
             was_running: wasRunning
         });
-        const toggleBtn = document.getElementById('timer-toggle-btn');
-        if (toggleBtn) {
-            toggleBtn.textContent = 'Iniciar';
-            toggleBtn.classList.remove('running');
-        }
-        const cajaTimer = document.querySelector('.cooking-timer-box');
-        if (cajaTimer) cajaTimer.classList.remove('timer-alarm');
     }
 });
 

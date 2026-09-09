@@ -14,7 +14,7 @@ create table if not exists public.user_recipe_preferences (
     updated_at timestamptz not null default now(),
     check (cardinality(avoid_ingredients) <= 30),
     check (octet_length(array_to_string(avoid_ingredients, ',')) <= 3000),
-    check (equipment <@ array['horno', 'microondas', 'air_fryer', 'licuadora', 'olla_presion', 'parrilla']::text[])
+    check (equipment <@ array['horno', 'hornallas', 'microondas', 'air_fryer', 'procesadora', 'licuadora', 'minipimer', 'batidora', 'olla_presion', 'vaporera', 'parrilla', 'wok']::text[])
 );
 
 alter table public.user_recipe_preferences enable row level security;

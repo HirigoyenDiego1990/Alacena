@@ -3633,16 +3633,50 @@ button[type="submit"]:hover {
    ============================================ */
 
 .cooking-timer-box {
-  background: rgba(251, 246, 236, 0.06);
+  --timer-progress: 0deg;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(232, 163, 61, 0.11), transparent 44%),
+    rgba(251, 246, 236, 0.055);
   border: 1px solid var(--line-on-dark);
-  border-radius: var(--r-md);
-  padding: 14px 18px;
+  border-radius: 22px;
+  padding: 18px;
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  transition: border-color 0.3s ease;
+  gap: 16px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.timer-heading {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.timer-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.timer-heading > svg {
+  width: 22px;
+  height: 22px;
+  color: var(--saffron);
+}
+
+.timer-heading-title {
+  color: var(--cream-text);
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.timer-status-text {
+  color: rgba(243, 239, 226, 0.52);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* Pulso visual mientras suena la alarma del timer */
@@ -3651,30 +3685,108 @@ button[type="submit"]:hover {
   animation: alarmPulse 0.7s ease-in-out infinite;
 }
 
+.cooking-timer-box.timer-alarm .timer-progress-ring {
+  background: conic-gradient(var(--paprika) 360deg, rgba(251, 246, 236, 0.09) 0);
+}
+
+.cooking-timer-box.timer-alarm .timer-status-text,
+.cooking-timer-box.timer-alarm .timer-display {
+  color: #ff9b7d;
+}
+
 @keyframes alarmPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(193, 80, 46, 0.4); }
   50% { box-shadow: 0 0 0 10px rgba(193, 80, 46, 0); }
 }
 
 .timer-display-container {
+  position: relative;
+  z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: #263129;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.16);
+}
+
+.timer-progress-ring {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 146px;
+  height: 146px;
+  padding: 7px;
+  border-radius: 50%;
+  background: conic-gradient(var(--saffron) var(--timer-progress), rgba(251, 246, 236, 0.09) 0);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
+  transition: background 0.35s linear;
 }
 
 .timer-display {
   font-family: 'Fraunces', serif;
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 700;
   color: var(--saffron);
-  letter-spacing: 2px;
+  letter-spacing: 1px;
+  line-height: 1;
 }
 
-.timer-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
+.timer-display-caption {
+  margin-top: 7px;
+  color: rgba(243, 239, 226, 0.38);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.timer-adjust-controls {
+  display: grid;
+  grid-template-columns: 38px 38px 1fr 38px 38px;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.timer-adjust-controls > span {
+  color: rgba(243, 239, 226, 0.5);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.timer-adjust-btn {
+  height: 36px;
+  border: 1px solid var(--line-on-dark);
+  border-radius: 10px;
+  background: rgba(251, 246, 236, 0.07);
+  color: var(--cream-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.timer-adjust-btn:hover {
+  border-color: rgba(232, 163, 61, 0.55);
+  background: rgba(232, 163, 61, 0.13);
+}
+
+.timer-adjust-btn:active,
+.timer-preset-btn:active,
+.timer-action-btn:active {
+  transform: scale(0.96);
+}
+
+.timer-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
   width: 100%;
 }
 
@@ -3682,12 +3794,12 @@ button[type="submit"]:hover {
   background: rgba(251, 246, 236, 0.1);
   border: 1px solid var(--line-on-dark);
   color: var(--cream-text);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 4px;
+  border-radius: 9px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .timer-preset-btn:hover {
@@ -3696,13 +3808,21 @@ button[type="submit"]:hover {
 }
 
 .timer-action-btn {
+  min-height: 42px;
   font-size: 12px;
   font-weight: 700;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: none;
+  padding: 9px 14px;
+  border-radius: 11px;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.timer-main-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 9px;
+  width: 100%;
 }
 
 .timer-action-btn.start {
@@ -3711,16 +3831,23 @@ button[type="submit"]:hover {
 }
 
 .timer-action-btn.start.running {
-  background: #e76f51; /* Color alerta/pausa */
+  background: var(--paprika);
   color: white;
+}
+
+.timer-action-btn.start:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 
 .timer-action-btn.reset {
   background: rgba(251, 246, 236, 0.1);
+  border-color: var(--line-on-dark);
   color: var(--cream-text);
-  display: grid;
-  place-items: center;
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
 .timer-action-btn.reset:hover {

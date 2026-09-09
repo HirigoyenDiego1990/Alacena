@@ -357,11 +357,17 @@
                                 <span>Equipamiento disponible</span>
                                 <div class="equipment-options">
                                     <label><input type="checkbox" name="preference-equipment" value="horno"> Horno</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="hornallas"> Cocina con hornallas</label>
                                     <label><input type="checkbox" name="preference-equipment" value="microondas"> Microondas</label>
                                     <label><input type="checkbox" name="preference-equipment" value="air_fryer"> Air fryer</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="procesadora"> Procesadora</label>
                                     <label><input type="checkbox" name="preference-equipment" value="licuadora"> Licuadora</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="minipimer"> Minipimer</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="batidora"> Batidora</label>
                                     <label><input type="checkbox" name="preference-equipment" value="olla_presion"> Olla a presión</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="vaporera"> Vaporera</label>
                                     <label><input type="checkbox" name="preference-equipment" value="parrilla"> Parrilla</label>
+                                    <label><input type="checkbox" name="preference-equipment" value="wok"> Wok</label>
                                 </div>
                             </div>
                         </fieldset>
@@ -554,20 +560,44 @@
                 </div>
 
                 <!-- TEMPORIZADOR INTEGRADO -->
-                <div class="cooking-timer-box">
-                    <div class="timer-display-container">
-                        <i data-lucide="timer" class="w-5 h-5 text-amber-400"></i>
-                        <span id="cooking-timer-display" class="timer-display">00:00</span>
+                <div class="cooking-timer-box" aria-label="Temporizador de cocina">
+                    <div class="timer-heading">
+                        <div>
+                            <span class="timer-heading-title">Temporizador</span>
+                            <span id="timer-status-text" class="timer-status-text">Elegí un tiempo</span>
+                        </div>
+                        <i data-lucide="timer" aria-hidden="true"></i>
                     </div>
-                    <div class="timer-controls">
-                        <button type="button" class="timer-preset-btn" data-time="1">1 min</button>
+
+                    <div id="timer-progress-ring" class="timer-progress-ring" role="progressbar" aria-label="Tiempo restante" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="timer-display-container">
+                            <span id="cooking-timer-display" class="timer-display" aria-live="polite">00:00</span>
+                            <span class="timer-display-caption">min : seg</span>
+                        </div>
+                    </div>
+
+                    <div class="timer-adjust-controls" aria-label="Ajustar tiempo">
+                        <button type="button" class="timer-adjust-btn" data-adjust="-5" aria-label="Quitar 5 minutos">−5</button>
+                        <button type="button" class="timer-adjust-btn" data-adjust="-1" aria-label="Quitar 1 minuto">−1</button>
+                        <span>minutos</span>
+                        <button type="button" class="timer-adjust-btn" data-adjust="1" aria-label="Agregar 1 minuto">+1</button>
+                        <button type="button" class="timer-adjust-btn" data-adjust="5" aria-label="Agregar 5 minutos">+5</button>
+                    </div>
+
+                    <div class="timer-presets" aria-label="Tiempos rápidos">
                         <button type="button" class="timer-preset-btn" data-time="3">3 min</button>
                         <button type="button" class="timer-preset-btn" data-time="5">5 min</button>
                         <button type="button" class="timer-preset-btn" data-time="10">10 min</button>
-                        <button type="button" id="timer-toggle-btn" class="timer-action-btn start">Iniciar</button>
-                        <button type="button" id="timer-reset-btn" class="timer-action-btn reset" title="Reiniciar">
+                        <button type="button" class="timer-preset-btn" data-time="15">15 min</button>
+                        <button type="button" class="timer-preset-btn" data-time="30">30 min</button>
+                    </div>
+
+                    <div class="timer-main-actions">
+                        <button type="button" id="timer-reset-btn" class="timer-action-btn reset" title="Reiniciar temporizador">
                             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            <span>Reiniciar</span>
                         </button>
+                        <button type="button" id="timer-toggle-btn" class="timer-action-btn start" disabled>Iniciar</button>
                     </div>
                 </div>
 
