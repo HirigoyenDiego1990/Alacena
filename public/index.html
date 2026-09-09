@@ -43,6 +43,9 @@
             </div>
             
             <div class="topbar-actions">
+                <button type="button" id="open-main-shopping-list-btn" class="shopping-topbar-btn hidden" title="Mi lista de compras" aria-label="Abrir mi lista de compras">
+                    <i data-lucide="shopping-basket"></i>
+                </button>
                 <button type="button" id="admin-panel-btn" class="admin-panel-btn hidden" title="Administrar solicitudes Premium" aria-label="Administrar solicitudes Premium">
                     <i data-lucide="shield-check"></i>
                     <span id="admin-pending-badge" class="admin-pending-badge hidden">0</span>
@@ -104,10 +107,6 @@
                             <span>Generar receta</span>
                         </button>
                     </div>
-                    <button type="button" id="open-main-shopping-list-btn" class="cook-shopping-list-btn hidden">
-                        <span>🛒</span>
-                        Mi lista
-                    </button>
                 </div>
 
                 <div id="recipes-container" class="recipe-list"></div>
