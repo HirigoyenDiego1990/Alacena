@@ -87,7 +87,7 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
-    v_generation_limit := case when v_plan = 'premium' then 50 else 3 end;
+    v_generation_limit := 3;
 
     -- Conservamos la última fecha aunque ya haya vencido para poder mostrar
     -- el aviso de renovación en la cuenta que volvió automáticamente a Free.
@@ -105,7 +105,7 @@ begin
       and usage_date = v_usage_date
       and metric = 'recipe_generation';
 
-    v_generation_used := coalesce(v_generation_used, 0);
+    v_generation_used := least(coalesce(v_generation_used, 0), v_generation_limit);
 
     return jsonb_build_object(
         'plan', v_plan,
@@ -140,7 +140,7 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
-    v_limit := case when v_plan = 'premium' then 50 else 3 end;
+    v_limit := 3;
 
     -- Recupera automáticamente reservas abandonadas por una caída del servidor.
     with released as (
@@ -183,7 +183,7 @@ begin
             'allowed', false,
             'plan', v_plan,
             'generation_limit', v_limit,
-            'generation_used', coalesce(v_used, v_limit),
+            'generation_used', least(coalesce(v_used, v_limit), v_limit),
             'generation_remaining', 0,
             'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
             'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
