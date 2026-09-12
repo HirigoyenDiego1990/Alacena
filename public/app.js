@@ -1355,10 +1355,54 @@ let adminRequests = [];
 let adminPaymentHistory = [];
 let adminPremiumCustomers = [];
 let adminStatusFilter = 'open';
+let adminViewMode = 'payments';
+let adminAnalyticsDays = 30;
+let adminAnalyticsLoaded = false;
 let adminReturnState = { view: viewCook, tab: tabCook, screen: 'cook' };
 let lastKnownAdminOpenCount = null;
 let adminRefreshTimer = null;
 const ADMIN_REQUEST_REFRESH_MS = 60 * 1000;
+
+const ADMIN_ANALYTICS_LABELS = {
+    app_opened: 'Aperturas de la app',
+    session_started: 'Sesiones iniciadas',
+    ingredients_bulk_added: 'Cargas de ingredientes',
+    ingredient_removed: 'Ingredientes eliminados',
+    recipe_generation_started: 'Generaciones iniciadas',
+    recipe_generation_succeeded: 'Generaciones exitosas',
+    recipe_generation_failed: 'Generaciones fallidas',
+    recipe_saved: 'Recetas guardadas',
+    recipe_opened: 'Recetas abiertas',
+    recipe_marked_cooked: 'Recetas cocinadas',
+    cooking_started: 'Modos Cocina iniciados',
+    cooking_step_completed: 'Pasos de cocina completados',
+    cooking_finished: 'Recetas finalizadas',
+    timer_configured: 'Temporizadores configurados',
+    timer_started: 'Temporizadores iniciados',
+    timer_paused: 'Temporizadores pausados',
+    timer_reset: 'Temporizadores reiniciados',
+    timer_finished: 'Temporizadores finalizados',
+    survival_roulette_used: 'Ruletas de supervivencia',
+    shopping_list_opened: 'Listas de compras abiertas',
+    shopping_list_synced: 'Listas de compras actualizadas',
+    shopping_manual_item_added: 'Productos agregados manualmente',
+    shopping_item_checked: 'Productos comprados',
+    shopping_item_cost_updated: 'Precios de compra cargados',
+    shopping_list_shared: 'Listas compartidas',
+    weekly_budget_updated: 'Presupuestos actualizados'
+};
+
+const ADMIN_SCREEN_LABELS = {
+    cook: 'Cocinar',
+    saved_recipes: 'Recetas guardadas',
+    preferences: 'Preferencias',
+    weekly_plan: 'Plan semanal',
+    shopping_list: 'Lista de compras',
+    plans: 'Planes',
+    premium_payment: 'Pago Premium',
+    cooking_mode: 'Modo Cocina',
+    cooking_history: 'Historial de cocina'
+};
 
 function escapeAdminText(value) {
     return String(value ?? '')
@@ -1387,6 +1431,137 @@ function adminStatusLabel(status) {
         rejected: 'Rechazado',
         cancelled: 'Cancelado'
     })[status] || status;
+}
+
+function formatAnalyticsNumber(value) {
+    return new Intl.NumberFormat('es-AR').format(Number(value) || 0);
+}
+
+function renderAnalyticsRankedList(elementId, entries, labelKey, emptyMessage) {
+    const container = document.getElementById(elementId);
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    if (safeEntries.length === 0) {
+        container.innerHTML = `<p class="analytics-list-empty">${escapeAdminText(emptyMessage)}</p>`;
+        return;
+    }
+
+    const maxValue = Math.max(...safeEntries.map(item => Number(item.event_count) || 0), 1);
+    container.innerHTML = safeEntries.map(item => {
+        const rawLabel = String(item[labelKey] || 'Sin identificar');
+        const label = labelKey === 'screen'
+            ? (ADMIN_SCREEN_LABELS[rawLabel] || rawLabel.replaceAll('_', ' '))
+            : (ADMIN_ANALYTICS_LABELS[rawLabel] || rawLabel.replaceAll('_', ' '));
+        const count = Number(item.event_count) || 0;
+        const width = Math.max(4, Math.round((count / maxValue) * 100));
+        return `
+            <div class="analytics-rank-item">
+                <span title="${escapeAdminText(label)}">${escapeAdminText(label)}</span>
+                <strong>${formatAnalyticsNumber(count)}</strong>
+                <div class="analytics-rank-track"><i style="width:${width}%"></i></div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderAdminAnalytics(payload) {
+    const summary = payload?.summary || {};
+    document.getElementById('analytics-users').textContent = formatAnalyticsNumber(summary.anonymous_users);
+    document.getElementById('analytics-sessions').textContent = formatAnalyticsNumber(summary.sessions);
+    document.getElementById('analytics-opens').textContent = formatAnalyticsNumber(summary.app_opens);
+    document.getElementById('analytics-recipes').textContent = formatAnalyticsNumber(summary.recipes_generated);
+    document.getElementById('analytics-generation-errors').textContent = formatAnalyticsNumber(summary.generation_errors);
+    document.getElementById('analytics-technical-errors').textContent = formatAnalyticsNumber(summary.technical_errors);
+    document.getElementById('analytics-ingredients-added').textContent = formatAnalyticsNumber(summary.ingredients_added);
+    document.getElementById('analytics-ingredients-removed').textContent = formatAnalyticsNumber(summary.ingredients_removed);
+    document.getElementById('analytics-pantry-average').textContent = formatAnalyticsNumber(summary.average_pantry_items);
+
+    const daily = (Array.isArray(payload?.daily) ? payload.daily : []).slice(-14);
+    const maxSessions = Math.max(...daily.map(day => Number(day.sessions) || 0), 1);
+    const dateFormatter = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' });
+    document.getElementById('analytics-daily-chart').innerHTML = daily.map(day => {
+        const sessions = Number(day.sessions) || 0;
+        const height = sessions === 0 ? 3 : Math.max(7, Math.round((sessions / maxSessions) * 88));
+        const date = new Date(`${day.event_date}T12:00:00`);
+        const label = Number.isNaN(date.getTime()) ? String(day.event_date || '') : dateFormatter.format(date);
+        const title = `${label}: ${sessions} sesiones, ${Number(day.recipes_generated) || 0} recetas`;
+        return `
+            <div class="analytics-day-column" title="${escapeAdminText(title)}">
+                <div class="analytics-day-bar-wrap"><i class="analytics-day-bar" style="height:${height}px"></i></div>
+                <small>${escapeAdminText(label)}</small>
+            </div>
+        `;
+    }).join('');
+
+    renderAnalyticsRankedList('analytics-top-screens', payload?.screens, 'screen', 'Todavía no hay visitas registradas.');
+    renderAnalyticsRankedList('analytics-key-actions', payload?.actions, 'event_name', 'Todavía no hay acciones registradas.');
+
+    const plans = Array.isArray(payload?.plans) ? payload.plans : [];
+    const planContainer = document.getElementById('analytics-plans');
+    planContainer.innerHTML = plans.length > 0
+        ? plans.map(plan => `
+            <div class="analytics-plan-row">
+                <span>${String(plan.plan_tier).toLowerCase() === 'premium' ? 'Premium' : 'Free'}</span>
+                <strong>${formatAnalyticsNumber(plan.anonymous_users)} usuarios · ${formatAnalyticsNumber(plan.sessions)} sesiones</strong>
+            </div>
+        `).join('')
+        : '<p class="analytics-list-empty">Todavía no hay actividad por plan.</p>';
+
+    const errors = (Array.isArray(payload?.errors) ? payload.errors : []).map(item => ({
+        ...item,
+        error_label: [item.context, item.error_type].filter(Boolean).join(' · ') || 'Sin identificar'
+    }));
+    renderAnalyticsRankedList('analytics-errors', errors, 'error_label', 'No se registraron errores en este período.');
+
+    document.getElementById('analytics-updated-at').textContent = `Actualizado ${new Intl.DateTimeFormat('es-AR', {
+        hour: '2-digit', minute: '2-digit'
+    }).format(new Date())}`;
+}
+
+async function loadAdminAnalytics() {
+    if (!isAppAdmin) return;
+    const loading = document.getElementById('analytics-loading');
+    const errorBox = document.getElementById('analytics-error');
+    const content = document.getElementById('analytics-content');
+    const refreshButton = document.getElementById('refresh-admin-requests-btn');
+
+    loading.classList.remove('hidden');
+    errorBox.classList.add('hidden');
+    if (!adminAnalyticsLoaded) content.classList.add('hidden');
+    refreshButton.classList.add('is-loading');
+    refreshButton.disabled = true;
+
+    const { data, error } = await supabase.rpc('get_admin_analytics', { p_days: adminAnalyticsDays });
+    refreshButton.classList.remove('is-loading');
+    refreshButton.disabled = false;
+    loading.classList.add('hidden');
+
+    if (error) {
+        trackTechnicalError('admin_analytics_load', error);
+        errorBox.textContent = 'No se pudieron cargar las métricas. Verificá que el SQL del Panel de Analytics esté ejecutado.';
+        errorBox.classList.remove('hidden');
+        return;
+    }
+
+    adminAnalyticsLoaded = true;
+    renderAdminAnalytics(data || {});
+    content.classList.remove('hidden');
+}
+
+function setAdminViewMode(viewName) {
+    adminViewMode = viewName === 'analytics' ? 'analytics' : 'payments';
+    const isAnalytics = adminViewMode === 'analytics';
+    document.getElementById('admin-payments-panel').classList.toggle('hidden', isAnalytics);
+    document.getElementById('admin-analytics-panel').classList.toggle('hidden', !isAnalytics);
+    document.getElementById('admin-view-title').textContent = isAnalytics ? 'Analytics de Alacena' : 'Solicitudes Premium';
+    document.getElementById('admin-view-description').textContent = isAnalytics
+        ? 'Entendé cómo se usa la app sin identificar personalmente a nadie.'
+        : 'Compará cada aviso con el movimiento recibido en Prex antes de aprobarlo.';
+    document.querySelectorAll('.admin-main-tab').forEach(button => {
+        const isActive = button.dataset.adminView === adminViewMode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+    });
+    if (isAnalytics) void loadAdminAnalytics();
 }
 
 function updateAdminSummary() {
@@ -1589,14 +1764,37 @@ document.getElementById('admin-panel-btn').addEventListener('click', async () =>
     if (!isAppAdmin) return;
     adminReturnState = obtenerVistaActualParaVolver();
     mostrarSubVista(viewAdmin, null, 'admin_premium_requests');
-    await loadAdminRequests();
+    setAdminViewMode(adminViewMode);
+    if (adminViewMode === 'payments') await loadAdminRequests();
 });
 
 document.getElementById('back-from-admin-btn').addEventListener('click', () => {
     mostrarSubVista(adminReturnState.view, adminReturnState.tab, adminReturnState.screen);
 });
 
-document.getElementById('refresh-admin-requests-btn').addEventListener('click', () => loadAdminRequests());
+document.getElementById('refresh-admin-requests-btn').addEventListener('click', () => {
+    if (adminViewMode === 'analytics') {
+        void loadAdminAnalytics();
+    } else {
+        void loadAdminRequests();
+    }
+});
+
+document.querySelector('.admin-main-tabs').addEventListener('click', event => {
+    const button = event.target.closest('[data-admin-view]');
+    if (!button || !isAppAdmin) return;
+    setAdminViewMode(button.dataset.adminView);
+});
+
+document.querySelector('.analytics-period-row').addEventListener('click', event => {
+    const button = event.target.closest('[data-analytics-days]');
+    if (!button || !isAppAdmin) return;
+    const requestedDays = Number(button.dataset.analyticsDays);
+    if (![7, 30, 90].includes(requestedDays) || requestedDays === adminAnalyticsDays) return;
+    adminAnalyticsDays = requestedDays;
+    document.querySelectorAll('.analytics-period-btn').forEach(item => item.classList.toggle('active', item === button));
+    void loadAdminAnalytics();
+});
 
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && isAppAdmin) {

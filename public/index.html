@@ -516,29 +516,119 @@
                 <section class="admin-hero">
                     <div>
                         <span class="plans-eyebrow">Solo administrador</span>
-                        <h2>Solicitudes Premium</h2>
-                        <p>Compará cada aviso con el movimiento recibido en Prex antes de aprobarlo.</p>
+                        <h2 id="admin-view-title">Solicitudes Premium</h2>
+                        <p id="admin-view-description">Compará cada aviso con el movimiento recibido en Prex antes de aprobarlo.</p>
                     </div>
-                    <button type="button" id="refresh-admin-requests-btn" class="admin-refresh-btn" aria-label="Actualizar solicitudes">
+                    <button type="button" id="refresh-admin-requests-btn" class="admin-refresh-btn" aria-label="Actualizar panel">
                         <i data-lucide="refresh-cw"></i>
                     </button>
                 </section>
 
-                <div class="admin-summary-grid">
-                    <article><span>Pendientes</span><strong id="admin-pending-count">0</strong></article>
-                    <article><span>Premium activos</span><strong id="admin-approved-count">0</strong></article>
-                    <article><span>Movimientos</span><strong id="admin-history-count">0</strong></article>
+                <div class="admin-main-tabs" role="tablist" aria-label="Secciones de administración">
+                    <button type="button" class="admin-main-tab active" data-admin-view="payments" role="tab" aria-selected="true">
+                        <i data-lucide="badge-dollar-sign"></i>
+                        Pagos
+                    </button>
+                    <button type="button" class="admin-main-tab" data-admin-view="analytics" role="tab" aria-selected="false">
+                        <i data-lucide="chart-no-axes-combined"></i>
+                        Analytics
+                    </button>
                 </div>
 
-                <div class="admin-filter-row" role="group" aria-label="Filtrar solicitudes">
-                    <button type="button" class="admin-filter-btn active" data-admin-status="open">Por revisar</button>
-                    <button type="button" class="admin-filter-btn" data-admin-status="all">Todas</button>
-                    <button type="button" class="admin-filter-btn" data-admin-status="customers">Clientes</button>
-                    <button type="button" class="admin-filter-btn" data-admin-status="history">Historial</button>
+                <div id="admin-payments-panel">
+                    <div class="admin-summary-grid">
+                        <article><span>Pendientes</span><strong id="admin-pending-count">0</strong></article>
+                        <article><span>Premium activos</span><strong id="admin-approved-count">0</strong></article>
+                        <article><span>Movimientos</span><strong id="admin-history-count">0</strong></article>
+                    </div>
+
+                    <div class="admin-filter-row" role="group" aria-label="Filtrar solicitudes">
+                        <button type="button" class="admin-filter-btn active" data-admin-status="open">Por revisar</button>
+                        <button type="button" class="admin-filter-btn" data-admin-status="all">Todas</button>
+                        <button type="button" class="admin-filter-btn" data-admin-status="customers">Clientes</button>
+                        <button type="button" class="admin-filter-btn" data-admin-status="history">Historial</button>
+                    </div>
+
+                    <div id="admin-requests-list" class="admin-requests-list">
+                        <p class="admin-empty-state">Cargando solicitudes…</p>
+                    </div>
                 </div>
 
-                <div id="admin-requests-list" class="admin-requests-list">
-                    <p class="admin-empty-state">Cargando solicitudes…</p>
+                <div id="admin-analytics-panel" class="admin-analytics-panel hidden">
+                    <div class="analytics-toolbar">
+                        <div class="analytics-period-row" role="group" aria-label="Período de Analytics">
+                            <button type="button" class="analytics-period-btn" data-analytics-days="7">7 días</button>
+                            <button type="button" class="analytics-period-btn active" data-analytics-days="30">30 días</button>
+                            <button type="button" class="analytics-period-btn" data-analytics-days="90">90 días</button>
+                        </div>
+                        <span id="analytics-updated-at" class="analytics-updated-at">—</span>
+                    </div>
+
+                    <div id="analytics-loading" class="admin-empty-state">Preparando tus métricas…</div>
+                    <div id="analytics-error" class="admin-empty-state admin-analytics-error hidden"></div>
+
+                    <div id="analytics-content" class="hidden">
+                        <div class="analytics-kpi-grid">
+                            <article><span>Usuarios</span><strong id="analytics-users">0</strong><small>anónimos</small></article>
+                            <article><span>Sesiones</span><strong id="analytics-sessions">0</strong><small>visitas</small></article>
+                            <article><span>Aperturas</span><strong id="analytics-opens">0</strong><small>de la app</small></article>
+                            <article><span>Recetas</span><strong id="analytics-recipes">0</strong><small>generadas</small></article>
+                            <article><span>Fallos IA</span><strong id="analytics-generation-errors">0</strong><small>generaciones</small></article>
+                            <article><span>Errores</span><strong id="analytics-technical-errors">0</strong><small>técnicos</small></article>
+                        </div>
+
+                        <section class="analytics-card analytics-activity-card">
+                            <div class="analytics-card-heading">
+                                <div>
+                                    <span class="analytics-eyebrow">Actividad reciente</span>
+                                    <h3>Uso diario</h3>
+                                </div>
+                                <div class="analytics-chart-legend"><span></span> Sesiones</div>
+                            </div>
+                            <div id="analytics-daily-chart" class="analytics-daily-chart"></div>
+                        </section>
+
+                        <div class="analytics-detail-grid">
+                            <section class="analytics-card">
+                                <div class="analytics-card-heading">
+                                    <div><span class="analytics-eyebrow">Navegación</span><h3>Pantallas más visitadas</h3></div>
+                                </div>
+                                <div id="analytics-top-screens" class="analytics-ranked-list"></div>
+                            </section>
+
+                            <section class="analytics-card">
+                                <div class="analytics-card-heading">
+                                    <div><span class="analytics-eyebrow">Interacción</span><h3>Acciones principales</h3></div>
+                                </div>
+                                <div id="analytics-key-actions" class="analytics-ranked-list"></div>
+                            </section>
+
+                            <section class="analytics-card">
+                                <div class="analytics-card-heading">
+                                    <div><span class="analytics-eyebrow">Alacena</span><h3>Uso de ingredientes</h3></div>
+                                </div>
+                                <div class="analytics-plan-split">
+                                    <div class="analytics-plan-row"><span>Ingredientes agregados</span><strong id="analytics-ingredients-added">0</strong></div>
+                                    <div class="analytics-plan-row"><span>Ingredientes eliminados</span><strong id="analytics-ingredients-removed">0</strong></div>
+                                    <div class="analytics-plan-row"><span>Disponibles en promedio</span><strong id="analytics-pantry-average">0</strong></div>
+                                </div>
+                            </section>
+
+                            <section class="analytics-card">
+                                <div class="analytics-card-heading">
+                                    <div><span class="analytics-eyebrow">Planes</span><h3>Actividad por plan</h3></div>
+                                </div>
+                                <div id="analytics-plans" class="analytics-plan-split"></div>
+                            </section>
+
+                            <section class="analytics-card">
+                                <div class="analytics-card-heading">
+                                    <div><span class="analytics-eyebrow">Estabilidad</span><h3>Origen de errores</h3></div>
+                                </div>
+                                <div id="analytics-errors" class="analytics-ranked-list"></div>
+                            </section>
+                        </div>
+                    </div>
                 </div>
             </div>
 
