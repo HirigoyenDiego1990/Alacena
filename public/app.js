@@ -20,12 +20,12 @@ let analyticsSessionId = null;
 let analyticsIsNewSession = false;
 let currentPlanState = {
     plan: 'free',
-    generation_limit: 3,
+    generation_limit: 1,
     generation_used: 0,
     generation_remaining: 3,
     pantry_limit: 20,
-    saved_recipe_limit: 10,
-    alacena_results: 2,
+    saved_recipe_limit: 0,
+    alacena_results: 1,
     suggestion_results: 1,
     current_period_end: null
 };
