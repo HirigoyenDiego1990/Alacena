@@ -8,22 +8,25 @@ const plansSql = fs.readFileSync(path.join(projectRoot, 'supabase-plans.sql'), '
 const migrationSql = fs.readFileSync(path.join(projectRoot, 'supabase-generation-limit.sql'), 'utf8');
 const plansHtml = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
 
-test('limita a tres generaciones diarias en las funciones base', () => {
-    assert.match(plansSql, /v_generation_limit\s*:=\s*3/);
-    assert.match(plansSql, /v_limit\s*:=\s*3/);
-    assert.doesNotMatch(plansSql, /then\s+50\s+else\s+3/i);
+test('limita las generaciones diarias y resultados según el plan', () => {
+    // Plan Free: 1 generación diaria, 1 receta normal + 1 sugerencia (2 recetas en total)
+    assert.match(plansSql, /v_generation_limit\s*:=\s*1/);
+    assert.match(plansSql, /alacena_results\s*:=\s*1/);
+    assert.match(plansSql, /suggestion_results\s*:=\s*1/);
 });
 
-test('la migración actualiza consulta y reserva con el mismo límite', () => {
+test('la migración actualiza consulta y reserva con los nuevos límites', () => {
     assert.match(migrationSql, /create or replace function public\.get_my_plan_limits\(\)/);
     assert.match(migrationSql, /create or replace function public\.reserve_recipe_generation\(\)/);
-    assert.match(migrationSql, /v_generation_limit integer := 3/);
-    assert.match(migrationSql, /v_limit integer := 3/);
+    assert.match(migrationSql, /v_generation_limit integer := 1/);
+    assert.match(migrationSql, /v_limit integer := 1/);
     assert.match(migrationSql, /least\(coalesce\(v_generation_used, 0\), v_generation_limit\)/);
 });
 
-test('la comparación comunica los totales diarios correctos', () => {
-    assert.match(plansHtml, /hasta <strong>9 recetas<\/strong>/);
-    assert.match(plansHtml, /hasta <strong>30 recetas<\/strong>/);
+test('la comparación comunica los totales diarios correctos en la interfaz', () => {
+    // Plan Free: 2 recetas totales (1 receta + 1 sugerencia)
+    assert.match(plansHtml, /hasta <strong>2 recetas<\/strong>/);
+    // Plan Premium: 2 generaciones diarias con 5 recetas + 2 sugerencias (14 recetas total)
+    assert.match(plansHtml, /hasta <strong>14 recetas<\/strong>/);
     assert.doesNotMatch(plansHtml, /<strong>50<\/strong> generaciones/);
 });
