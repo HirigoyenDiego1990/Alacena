@@ -1,6 +1,5 @@
--- Ajusta el límite diario a 3 generaciones para Free y Premium.
--- Free recibe hasta 9 recetas por día; Premium, hasta 30.
--- Ejecutar una sola vez en Supabase SQL Editor.
+-- Actualiza límites y resultados por generación para planes Free y Premium.
+-- Ejecutar en el SQL Editor de Supabase.
 
 create or replace function public.get_my_plan_limits()
 returns jsonb
@@ -12,7 +11,7 @@ as $$
 declare
     v_user_id uuid := auth.uid();
     v_plan text;
-    v_generation_limit integer := 3;
+    v_generation_limit integer;
     v_generation_used integer;
     v_current_period_end timestamptz;
     v_usage_date date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
@@ -22,6 +21,9 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
+    
+    -- Límite diario de generaciones según plan
+    v_generation_limit := case when v_plan = 'premium' then 2 else 1 end;
 
     select current_period_end
     into v_current_period_end
@@ -46,9 +48,9 @@ begin
         'generation_used', v_generation_used,
         'generation_remaining', greatest(v_generation_limit - v_generation_used, 0),
         'pantry_limit', case when v_plan = 'premium' then null else 20 end,
-        'saved_recipe_limit', case when v_plan = 'premium' then null else 10 end,
-        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-        'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+        'saved_recipe_limit', case when v_plan = 'premium' then null else 0 end,
+        'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+        'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
     );
 end;
 $$;
@@ -62,7 +64,7 @@ as $$
 declare
     v_user_id uuid := auth.uid();
     v_plan text;
-    v_limit integer := 3;
+    v_limit integer;
     v_used integer;
     v_reservation_id uuid;
     v_usage_date date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
@@ -72,6 +74,9 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
+    
+    -- Límite diario de generaciones según plan
+    v_limit := case when v_plan = 'premium' then 2 else 1 end;
 
     -- Recupera reservas abandonadas por una caída del servidor.
     with released as (
@@ -116,8 +121,8 @@ begin
             'generation_limit', v_limit,
             'generation_used', least(coalesce(v_used, v_limit), v_limit),
             'generation_remaining', 0,
-            'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-            'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+            'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+            'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
         );
     end if;
 
@@ -132,8 +137,8 @@ begin
         'generation_limit', v_limit,
         'generation_used', v_used,
         'generation_remaining', greatest(v_limit - v_used, 0),
-        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-        'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+        'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+        'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
     );
 end;
 $$;

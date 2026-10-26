@@ -1,5 +1,5 @@
 -- Ejecutar una sola vez en el SQL Editor de Supabase.
--- Implementa planes, límites diarios y reservas atómicas de generación.
+-- Implementa planes, límites diarios y reservas atómicas de generación con los nuevos valores.
 
 create table if not exists public.user_entitlements (
     user_id uuid primary key references auth.users(id) on delete cascade,
@@ -87,7 +87,9 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
-    v_generation_limit := 3;
+    
+    -- Límite diario: 2 para Premium, 1 para Free
+    v_generation_limit := case when v_plan = 'premium' then 2 else 1 end;
 
     -- Conservamos la última fecha aunque ya haya vencido para poder mostrar
     -- el aviso de renovación en la cuenta que volvió automáticamente a Free.
@@ -114,9 +116,9 @@ begin
         'generation_used', v_generation_used,
         'generation_remaining', greatest(v_generation_limit - v_generation_used, 0),
         'pantry_limit', case when v_plan = 'premium' then null else 20 end,
-        'saved_recipe_limit', case when v_plan = 'premium' then null else 10 end,
-        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-        'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+        'saved_recipe_limit', case when v_plan = 'premium' then null else 0 end,
+        'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+        'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
     );
 end;
 $$;
@@ -140,7 +142,9 @@ begin
     end if;
 
     v_plan := public.get_effective_plan(v_user_id);
-    v_limit := 3;
+    
+    -- Límite diario: 2 para Premium, 1 para Free
+    v_limit := case when v_plan = 'premium' then 2 else 1 end;
 
     -- Recupera automáticamente reservas abandonadas por una caída del servidor.
     with released as (
@@ -185,8 +189,8 @@ begin
             'generation_limit', v_limit,
             'generation_used', least(coalesce(v_used, v_limit), v_limit),
             'generation_remaining', 0,
-            'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-            'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+            'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+            'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
         );
     end if;
 
@@ -201,8 +205,8 @@ begin
         'generation_limit', v_limit,
         'generation_used', v_used,
         'generation_remaining', greatest(v_limit - v_used, 0),
-        'alacena_results', case when v_plan = 'premium' then 7 else 2 end,
-        'suggestion_results', case when v_plan = 'premium' then 3 else 1 end
+        'alacena_results', case when v_plan = 'premium' then 5 else 1 end,
+        'suggestion_results', case when v_plan = 'premium' then 2 else 1 end
     );
 end;
 $$;
@@ -285,8 +289,9 @@ as $$
 begin
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.user_id::text, 1));
 
+    -- Si es usuario free, bloquea cualquier guardado de recetas (límite 0)
     if public.get_effective_plan(new.user_id) = 'free'
-       and (select count(*) from public.saved_recipes where user_id = new.user_id) >= 10 then
+       and (select count(*) from public.saved_recipes where user_id = new.user_id) >= 0 then
         raise exception 'FREE_SAVED_RECIPE_LIMIT';
     end if;
     return new;
@@ -310,9 +315,3 @@ grant execute on function public.get_my_plan_limits() to authenticated;
 grant execute on function public.reserve_recipe_generation() to authenticated;
 grant execute on function public.complete_recipe_generation(uuid) to authenticated;
 grant execute on function public.release_recipe_generation(uuid) to authenticated;
-
--- Para convertir manualmente un usuario a Premium durante las pruebas:
--- insert into public.user_entitlements (user_id, plan, status)
--- values ('UUID_DEL_USUARIO', 'premium', 'active')
--- on conflict (user_id) do update
--- set plan = 'premium', status = 'active', updated_at = now();
